@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pystray
+pynput
+pyperclip
+qrcode[pil]
+Pillow
