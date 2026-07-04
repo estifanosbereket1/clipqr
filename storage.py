@@ -51,3 +51,33 @@ def get_history(limit=20):
     ).fetchall()
     conn.close()
     return latest_contents
+
+
+def get_entry_by_id(entry_id):
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    entry = cur.execute("SELECT * FROM history WHERE id = (?)", (entry_id,)).fetchone()
+    conn.close()
+    return entry
+
+
+def delete_entry(entry_id):
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM history where id = (?)", (entry_id,))
+    rows_deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return rows_deleted
+
+
+def clear_history():
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM history")
+    conn.commit()
+    conn.close()
