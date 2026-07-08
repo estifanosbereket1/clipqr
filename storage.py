@@ -31,6 +31,68 @@ def init_db():
         cur.execute(
             "CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY,content TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, pinned BOOLEAN DEFAULT 0)"
         )
+        cur.execute("PRAGMA table_info(history)")
+        columns = [row["name"] for row in cur.fetchall()]
+        if "pinned_at" not in columns:
+            cur.execute(
+                "ALTER TABLE history ADD COLUMN pinned_at DATETIME DEFAULT NULL"
+            )
+
+
+MAX_PINNED = 5
+
+
+def get_pinned_entries():
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM history WHERE pinned = 1 ORDER BY pinned_at DESC"
+        ).fetchall()
+
+
+def get_oldest_pinned_entry():
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM history WHERE pinned = 1 ORDER BY pinned_at ASC LIMIT 1"
+        ).fetchone()
+
+
+def pin_entry(entry_id):
+    """
+    Attempts to pin an entry. Returns None on success.
+    If already at MAX_PINNED, returns the oldest pinned entry instead of pinning,
+    so the caller can ask the user to confirm swapping it out.
+    """
+    with get_connection() as conn:
+        cur = conn.cursor()
+        count = cur.execute(
+            "SELECT COUNT(*) as c FROM history WHERE pinned = 1"
+        ).fetchone()["c"]
+        if count >= MAX_PINNED:
+            return get_oldest_pinned_entry()
+        cur.execute(
+            "UPDATE history SET pinned = 1, pinned_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (entry_id,),
+        )
+        return None
+
+
+def unpin_entry(entry_id):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE history SET pinned = 0, pinned_at = NULL WHERE id = ?", (entry_id,)
+        )
+
+
+def get_recent_unpinned(limit=20):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM history WHERE pinned = 0 ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
 
 
 def add_entry(content: str):

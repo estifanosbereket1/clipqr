@@ -33,9 +33,15 @@ def main():
     cert_path = str(cert_dir / "cert.pem")
     key_path = str(cert_dir / "key.pem")
 
+    def on_clipboard_changed():
+        GLib.idle_add(history_window.refresh)
+
     threading.Thread(
         target=start_monitoring,
-        kwargs={"poll_interval": settings["poll_interval"]},
+        kwargs={
+            "poll_interval": settings["poll_interval"],
+            "on_change": on_clipboard_changed,
+        },
         daemon=True,
     ).start()
 
