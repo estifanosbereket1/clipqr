@@ -8,6 +8,7 @@ DEFAULTS = {
     "poll_interval": 1.0,
     "port": 8000,
     "last_known_ip": None,
+    "playback_mode": "time",
 }
 
 # Bounds used for validation when saving.
@@ -88,6 +89,9 @@ def validate_settings(new_values: dict) -> list[str]:
             errors.append(
                 f"Port must be a whole number between {PORT_MIN} and {PORT_MAX}."
             )
+    if "playback_mode" in new_values:
+        if new_values["playback_mode"] not in ("time", "index"):
+            errors.append("Playback mode must be 'time' or 'index'.")
 
     return errors
 

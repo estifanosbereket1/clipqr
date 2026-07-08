@@ -7,6 +7,7 @@ import uvicorn
 from clipboard_monitor import start_monitoring
 from history_window import HistoryWindow, open_qr_popup
 from hotkey import setup_signal_listener
+from playback_window import PlaybackWindow
 from qr_server import app as qr_app
 from settings_window import SettingsWindow
 from storage import init_db
@@ -32,6 +33,9 @@ def main():
     cert_dir = get_cert_dir()
     cert_path = str(cert_dir / "cert.pem")
     key_path = str(cert_dir / "key.pem")
+
+    def open_playback():
+        PlaybackWindow()
 
     def on_clipboard_changed():
         GLib.idle_add(history_window.refresh)
@@ -77,7 +81,10 @@ def main():
         SettingsWindow()
 
     indicator = setup_tray_icon(
-        on_open=show_history_window, on_settings=open_settings, on_quit=quit_app
+        on_open=show_history_window,
+        on_settings=open_settings,
+        on_playback=open_playback,
+        on_quit=quit_app,
     )
 
     Gtk.main()

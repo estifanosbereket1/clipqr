@@ -103,6 +103,17 @@ class SettingsWindow(Gtk.Window):
         port_row.pack_start(self.port_spin, False, False, 0)
         outer.pack_start(port_row, False, False, 0)
 
+        playback_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        playback_row.pack_start(Gtk.Label(label="Playback mode:"), False, False, 0)
+
+        self.playback_combo = Gtk.ComboBoxText()
+        self.playback_combo.append("time", "Visual timeline (fun)")
+        self.playback_combo.append("index", "Simple slider")
+        self.playback_combo.set_active_id(app_settings.get("playback_mode", "time"))
+
+        playback_row.pack_start(self.playback_combo, False, False, 0)
+        outer.pack_start(playback_row, False, False, 0)
+
         # Save button + status
         self.settings_status_label = Gtk.Label(label="")
         outer.pack_start(self.settings_status_label, False, False, 0)
@@ -146,6 +157,7 @@ class SettingsWindow(Gtk.Window):
             "history_limit": self.history_spin.get_value_as_int(),
             "poll_interval": round(self.poll_spin.get_value(), 1),
             "port": self.port_spin.get_value_as_int(),
+            "playback_mode": self.playback_combo.get_active_id(),
         }
         errors = save_settings(new_values)
         if errors:
