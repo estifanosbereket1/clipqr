@@ -5,6 +5,7 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
 from qr_display import QrPopup
+from settings_store import load_settings
 from storage import add_entry, delete_entry, get_history
 
 
@@ -66,7 +67,7 @@ class HistoryWindow(Gtk.Window):
         for child in self.list_box.get_children():
             self.list_box.remove(child)
 
-        entries = get_history(limit=50)
+        entries = get_history(limit=load_settings()["history_limit"])
 
         if not entries:
             empty_label = Gtk.Label(label="No clipboard history yet.")

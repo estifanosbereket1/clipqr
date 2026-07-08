@@ -9,6 +9,7 @@ from gnome_shortcuts import (
     is_combo_taken,
     register_custom_shortcut,
 )
+from settings_store import load_settings, save_settings
 
 SHORTCUT_NAME = "Open ClipQR"
 SHORTCUT_COMMAND = "kill -SIGUSR1 $(cat /tmp/clipqr.pid)"
@@ -60,8 +61,69 @@ class SettingsWindow(Gtk.Window):
         self.save_button.connect("clicked", self.on_save_clicked)
         outer.pack_start(self.save_button, False, False, 0)
 
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        outer.pack_start(separator, False, False, 10)
+
+        app_settings = load_settings()
+
+        # History limit
+        history_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        history_row.pack_start(Gtk.Label(label="History limit:"), False, False, 0)
+        history_adj = Gtk.Adjustment(
+            value=app_settings["history_limit"], lower=1, upper=1000, step_increment=1
+        )
+        self.history_spin = Gtk.SpinButton()
+        self.history_spin.set_adjustment(history_adj)
+        history_row.pack_start(self.history_spin, False, False, 0)
+        outer.pack_start(history_row, False, False, 0)
+
+        # Poll interval
+        poll_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        poll_row.pack_start(Gtk.Label(label="Poll interval (sec):"), False, False, 0)
+        poll_adj = Gtk.Adjustment(
+            value=app_settings["poll_interval"], lower=0.2, upper=10, step_increment=0.1
+        )
+        self.poll_spin = Gtk.SpinButton()
+        self.poll_spin.set_adjustment(poll_adj)
+        self.poll_spin.set_digits(1)  # allow one decimal place
+        poll_row.pack_start(self.poll_spin, False, False, 0)
+        outer.pack_start(poll_row, False, False, 0)
+
+        # Port
+        port_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        port_row.pack_start(Gtk.Label(label="Server port:"), False, False, 0)
+        port_adj = Gtk.Adjustment(
+            value=app_settings["port"], lower=1024, upper=65535, step_increment=1
+        )
+        self.port_spin = Gtk.SpinButton()
+        self.port_spin.set_adjustment(port_adj)
+        port_row.pack_start(self.port_spin, False, False, 0)
+        outer.pack_start(port_row, False, False, 0)
+
+        # Save button + status
+        self.settings_status_label = Gtk.Label(label="")
+        outer.pack_start(self.settings_status_label, False, False, 0)
+
+        save_settings_button = Gtk.Button(label="Save Settings")
+        save_settings_button.connect("clicked", self.on_save_settings_clicked)
+        outer.pack_start(save_settings_button, False, False, 0)
+
         self.show_all()
         self.grab_focus()
+
+    def on_save_settings_clicked(self, _button):
+        new_values = {
+            "history_limit": self.history_spin.get_value_as_int(),
+            "poll_interval": round(self.poll_spin.get_value(), 1),
+            "port": self.port_spin.get_value_as_int(),
+        }
+        errors = save_settings(new_values)
+        if errors:
+            self.settings_status_label.set_text("\n".join(errors))
+        else:
+            self.settings_status_label.set_text(
+                "Saved. Poll interval and port changes require an app restart."
+            )
 
     def on_key_press(self, _widget, event):
         # Ignore lone modifier presses (Ctrl/Alt/Shift/Super by themselves) --

@@ -18,18 +18,39 @@ from gi.repository import GLib, Gtk
 
 def main():
     init_db()
-    threading.Thread(target=start_monitoring, daemon=True).start()
+
+    from cert_manager import get_cert_dir, regenerate_cert_for_ip
+    from settings_store import check_ip_changed, load_settings, save_settings
+
+    changed, old_ip, new_ip = check_ip_changed()
+    if changed and new_ip:
+        print(f"LAN IP changed ({old_ip} -> {new_ip}), regenerating certificate...")
+        regenerate_cert_for_ip(new_ip)
+        save_settings({"last_known_ip": new_ip})
+
+    settings = load_settings()
+    cert_dir = get_cert_dir()
+    cert_path = str(cert_dir / "cert.pem")
+    key_path = str(cert_dir / "key.pem")
+
+    threading.Thread(
+        target=start_monitoring,
+        kwargs={"poll_interval": settings["poll_interval"]},
+        daemon=True,
+    ).start()
+
     threading.Thread(
         target=uvicorn.run,
         kwargs={
             "app": qr_app,
             "host": "0.0.0.0",
-            "port": 8000,
-            "ssl_keyfile": "192.168.0.136+2-key.pem",
-            "ssl_certfile": "192.168.0.136+2.pem",
+            "port": settings["port"],
+            "ssl_keyfile": key_path,
+            "ssl_certfile": cert_path,
         },
         daemon=True,
     ).start()
+
     history_window = HistoryWindow(on_qr_clicked=open_qr_popup)
 
     def show_history_window():
