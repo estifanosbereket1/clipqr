@@ -6,6 +6,7 @@ from datetime import datetime
 
 from gi.repository import GLib, Gtk
 
+from clipboard_wipe import schedule_wipe
 from qr_display import QrPopup
 from settings_store import load_settings
 from storage import (
@@ -14,6 +15,7 @@ from storage import (
     get_pinned_entries,
     get_recent_unpinned,
     pin_entry,
+    toggle_self_destruct,
     unpin_entry,
 )
 
@@ -213,6 +215,19 @@ class HistoryWindow(Gtk.Window):
         pin_button = self._icon_button(pin_icon, pin_tooltip)
         pin_button.connect("clicked", self._make_pin_handler(entry, is_pinned))
 
+        burn_icon = (
+            "edit-clear-all-symbolic"
+            if entry["self_destruct"]
+            else "edit-clear-symbolic"
+        )
+        burn_tooltip = (
+            "Self-destruct: ON (copy will auto-delete + wipe clipboard)"
+            if entry["self_destruct"]
+            else "Mark as self-destruct"
+        )
+        burn_button = self._icon_button(burn_icon, burn_tooltip)
+        burn_button.connect("clicked", self._make_burn_toggle_handler(entry))
+
         qr_button = self._icon_button("view-grid-symbolic", "Show QR code")
         qr_button.connect("clicked", self._make_qr_handler(entry))
 
@@ -223,6 +238,7 @@ class HistoryWindow(Gtk.Window):
         delete_button.connect("clicked", self._make_delete_handler(entry))
 
         row_box.pack_start(text_label, True, True, 0)
+        row_box.pack_end(burn_button, False, False, 0)
         row_box.pack_end(delete_button, False, False, 0)
         row_box.pack_end(copy_button, False, False, 0)
         row_box.pack_end(qr_button, False, False, 0)
@@ -294,13 +310,34 @@ class HistoryWindow(Gtk.Window):
         button.set_tooltip_text(tooltip)
         return button
 
-    def _make_copy_handler(self, entry):
+    def _make_burn_toggle_handler(self, entry):
         def handler(_button):
-            pyperclip.copy(entry["content"])
-            add_entry(entry["content"])
+            toggle_self_destruct(entry["id"])
             self.refresh()
 
         return handler
+
+    def _make_copy_handler(self, entry):
+        def handler(_button):
+            pyperclip.copy(entry["content"])
+
+            if entry["self_destruct"]:
+                delete_entry(entry["id"])
+                schedule_wipe(entry["content"])
+            else:
+                add_entry(entry["content"])
+
+            self.refresh()
+
+        return handler
+
+    # def _make_copy_handler(self, entry):
+    #     def handler(_button):
+    #         pyperclip.copy(entry["content"])
+    #         add_entry(entry["content"])
+    #         self.refresh()
+
+    #     return handler
 
     def _make_delete_handler(self, entry):
         def handler(_button):

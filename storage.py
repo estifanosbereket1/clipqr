@@ -41,6 +41,24 @@ def init_db():
             )
         if "content_type" not in columns:
             cur.execute("ALTER TABLE history ADD COLUMN content_type TEXT DEFAULT NULL")
+        if "self_destruct" not in columns:
+            cur.execute(
+                "ALTER TABLE history ADD COLUMN self_destruct BOOLEAN DEFAULT 0"
+            )
+
+
+def toggle_self_destruct(entry_id):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        current = cur.execute(
+            "SELECT self_destruct FROM history WHERE id = ?", (entry_id,)
+        ).fetchone()
+        if current is None:
+            return
+        new_value = 0 if current["self_destruct"] else 1
+        cur.execute(
+            "UPDATE history SET self_destruct = ? WHERE id = ?", (new_value, entry_id)
+        )
 
 
 MAX_PINNED = 5
