@@ -17,6 +17,10 @@ from peer_discovery import advertise_self, discover_peers
 from peer_store import upsert_discovered_peer
 from peer_sync import start_sync_loop
 
+from peer_window import PeerWindow
+
+
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
@@ -103,10 +107,14 @@ def main():
     def open_settings():
         SettingsWindow()
 
+    def open_peers():
+        PeerWindow()
+
     indicator = setup_tray_icon(
         on_open=show_history_window,
         on_settings=open_settings,
         on_playback=open_playback,
+        on_peers=open_peers,
         on_quit=quit_app,
     )
 

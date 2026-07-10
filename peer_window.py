@@ -45,6 +45,7 @@ class PeerWindow(Gtk.Window):
         outer.pack_start(self.paired_box, False, False, 0)
 
         self.refresh()
+        self.show_all()
 
     def refresh(self):
         for child in self.pending_box.get_children():

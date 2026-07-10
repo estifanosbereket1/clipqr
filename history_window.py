@@ -107,6 +107,13 @@ class HistoryWindow(Gtk.Window):
         self.list_box.set_selection_mode(Gtk.SelectionMode.NONE)
         scrolled.add(self.list_box)
 
+        self.synced_expander = Gtk.Expander(label="Synced from other devices")
+        outer_box.pack_start(self.synced_expander, False, False, 0)
+
+        self.synced_list_box = Gtk.ListBox()
+        self.synced_list_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.synced_expander.add(self.synced_list_box)
+
         self.refresh()
 
     def refresh(self):
@@ -126,21 +133,51 @@ class HistoryWindow(Gtk.Window):
             self.pinned_label.hide()
 
         recent_entries = get_recent_unpinned(limit=load_settings()["history_limit"])
-        if not recent_entries:
+
+        local_entries = [e for e in recent_entries if e["origin"] == "local"]
+        synced_entries = [e for e in recent_entries if e["origin"] != "local"]
+
+        if not local_entries:
             empty_label = Gtk.Label(label="No clipboard history yet.")
             empty_label.set_margin_top(20)
             self.list_box.add(empty_label)
         else:
-            for index, entry in enumerate(recent_entries):
-                previous_entry = (
-                    recent_entries[index + 1]
-                    if index + 1 < len(recent_entries)
-                    else None
-                )
-                row = self._build_row(
-                    entry, is_pinned=False, previous_entry=previous_entry
-                )
+            for index, entry in enumerate(local_entries):
+                previous_entry = local_entries[index + 1] if index + 1 < len(local_entries) else None
+                row = self._build_row(entry, is_pinned=False, previous_entry=previous_entry)
                 self.list_box.add(row)
+
+        for child in self.synced_list_box.get_children():
+            self.synced_list_box.remove(child)
+
+        if synced_entries:
+            self.synced_expander.set_label(f"Synced from other devices ({len(synced_entries)})")
+            self.synced_expander.show()
+            for index, entry in enumerate(synced_entries):
+                previous_entry = synced_entries[index + 1] if index + 1 < len(synced_entries) else None
+                row = self._build_row(entry, is_pinned=False, previous_entry=previous_entry)
+                self.synced_list_box.add(row)
+        else:
+            self.synced_expander.hide()
+
+        self.synced_list_box.show_all()
+
+        # recent_entries = get_recent_unpinned(limit=load_settings()["history_limit"])
+        # if not recent_entries:
+        #     empty_label = Gtk.Label(label="No clipboard history yet.")
+        #     empty_label.set_margin_top(20)
+        #     self.list_box.add(empty_label)
+        # else:
+        #     for index, entry in enumerate(recent_entries):
+        #         previous_entry = (
+        #             recent_entries[index + 1]
+        #             if index + 1 < len(recent_entries)
+        #             else None
+        #         )
+        #         row = self._build_row(
+        #             entry, is_pinned=False, previous_entry=previous_entry
+        #         )
+        #         self.list_box.add(row)
             # for entry in recent_entries:
             #     row = self._build_row(entry, is_pinned=False)
             #     self.list_box.add(row)
@@ -194,10 +231,15 @@ class HistoryWindow(Gtk.Window):
 
         # --- NEW: badge ---
         badge_text = self._format_badge(entry["content_type"])
-        if badge_text:
-            badge_label = Gtk.Label(label=badge_text)
-            badge_label.get_style_context().add_class("dim-label")
-            row_box.pack_start(badge_label, False, False, 0)
+        if entry["origin"] != "local":
+            peer_label_text = entry["origin"].split(".")[0]  # strip the .local. suffix etc, just show hostname
+            origin_label = Gtk.Label(label=f"↴ {peer_label_text}")
+            origin_label.get_style_context().add_class("dim-label")
+            row_box.pack_start(origin_label, False, False, 0)
+        # if badge_text:
+        #     badge_label = Gtk.Label(label=badge_text)
+        #     badge_label.get_style_context().add_class("dim-label")
+        #     row_box.pack_start(badge_label, False, False, 0)
 
         # --- NEW: time label + stale icon, grouped in their own small box ---
         time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
