@@ -13,11 +13,7 @@ from peer_store import get_paired_peers, get_peer_last_sync, set_peer_last_sync
 SYNC_INTERVAL_SECONDS = 8
 
 
-def pull_from_peer(peer_name: str, peer_info: dict):
-    """
-    Asks one paired peer for anything new since our last successful sync
-    with them, and inserts whatever comes back, tagged with their origin.
-    """
+def pull_from_peer(peer_name: str, peer_info: dict, on_change=None):
     ip = peer_info["ip"]
     port = peer_info["port"]
     since = get_peer_last_sync(peer_name)
@@ -32,25 +28,27 @@ def pull_from_peer(peer_name: str, peer_info: dict):
 
     entries = response.json()
     latest_timestamp = since
+    got_new_entry = False
 
     for entry in entries:
-        add_entry(entry["content"], origin=peer_name)
+        inserted = add_entry(entry["content"], origin=peer_name)
+        if inserted:
+            got_new_entry = True
         if entry["created_at"] > latest_timestamp:
             latest_timestamp = entry["created_at"]
 
     if entries:
         set_peer_last_sync(peer_name, latest_timestamp)
 
+    if got_new_entry and on_change:
+        on_change()
 
-def start_sync_loop():
-    """
-    Runs forever, periodically pulling from every currently-paired peer.
-    Intended to run in a background thread.
-    """
+
+def start_sync_loop(on_change=None):
     while True:
         peers = get_paired_peers()
         for name, info in peers.items():
-            pull_from_peer(name, info)
+            pull_from_peer(name, info, on_change=on_change)
         time.sleep(SYNC_INTERVAL_SECONDS)
 
 

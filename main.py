@@ -66,7 +66,11 @@ def main():
     zc_advertise, service_info = advertise_self(settings["port"], hostname_label=os.uname().nodename)
     zc_discover, browser = discover_peers(on_peer_found, on_peer_lost)
 
-    threading.Thread(target=start_sync_loop, daemon=True).start()
+    threading.Thread(
+        target=start_sync_loop,
+        kwargs={"on_change": on_clipboard_changed},
+        daemon=True,
+    ).start()
 
     threading.Thread(
         target=uvicorn.run,
