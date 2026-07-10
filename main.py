@@ -13,6 +13,10 @@ from settings_window import SettingsWindow
 from storage import init_db
 from tray import setup_tray_icon
 
+from peer_discovery import advertise_self, discover_peers
+from peer_store import upsert_discovered_peer
+from peer_sync import start_sync_loop
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
@@ -48,6 +52,21 @@ def main():
         },
         daemon=True,
     ).start()
+
+    def on_peer_found(name, ip, port):
+        my_ip = settings.get("last_known_ip")
+        my_port = settings["port"]
+        if ip == my_ip and port == my_port:
+            return
+        upsert_discovered_peer(name, ip, port)
+
+    def on_peer_lost(name):
+        pass
+
+    zc_advertise, service_info = advertise_self(settings["port"], hostname_label=os.uname().nodename)
+    zc_discover, browser = discover_peers(on_peer_found, on_peer_lost)
+
+    threading.Thread(target=start_sync_loop, daemon=True).start()
 
     threading.Thread(
         target=uvicorn.run,
