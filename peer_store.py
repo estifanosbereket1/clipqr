@@ -9,6 +9,8 @@ def get_peers_path() -> Path:
     return get_settings_path().parent / "peers.json"
 
 
+
+
 def load_peers() -> dict:
     """
     Returns a dict keyed by peer service name, each value like:
@@ -56,6 +58,9 @@ def get_peer_last_sync(name: str) -> str:
     if name in peers:
         return peers[name].get("last_sync", "2020-01-01 00:00:00")
     return "2020-01-01 00:00:00"
+
+def get_ignored_peers() -> dict:
+    return {name: info for name, info in load_peers().items() if info["status"] == "ignored"}
 
 
 def set_peer_last_sync(name: str, timestamp: str):

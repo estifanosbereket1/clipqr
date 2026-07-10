@@ -3,7 +3,8 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
-from peer_store import get_pending_peers, get_paired_peers, set_peer_status
+
+from peer_store import get_pending_peers, get_paired_peers, get_ignored_peers, set_peer_status
 
 
 class PeerWindow(Gtk.Window):
@@ -44,8 +45,19 @@ class PeerWindow(Gtk.Window):
         self.paired_box.set_selection_mode(Gtk.SelectionMode.NONE)
         outer.pack_start(self.paired_box, False, False, 0)
 
+        outer.pack_start(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL), False, False, 4)
+
+        self.ignored_expander = Gtk.Expander(label="Ignored devices")
+        outer.pack_start(self.ignored_expander, False, False, 0)
+
+        self.ignored_box = Gtk.ListBox()
+        self.ignored_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.ignored_expander.add(self.ignored_box)
+
         self.refresh()
         self.show_all()
+
+
 
     def refresh(self):
         for child in self.pending_box.get_children():
@@ -68,6 +80,20 @@ class PeerWindow(Gtk.Window):
         else:
             for name, info in paired.items():
                 self.paired_box.add(self._build_paired_row(name, info))
+
+        for child in self.ignored_box.get_children():
+            self.ignored_box.remove(child)
+
+        ignored = get_ignored_peers()
+        if ignored:
+            self.ignored_expander.set_label(f"Ignored devices ({len(ignored)})")
+            self.ignored_expander.show()
+            for name, info in ignored.items():
+                self.ignored_box.add(self._build_ignored_row(name, info))
+        else:
+            self.ignored_expander.hide()
+
+        self.ignored_box.show_all()
 
         self.pending_box.show_all()
         self.paired_box.show_all()
@@ -110,6 +136,25 @@ class PeerWindow(Gtk.Window):
 
         box.pack_start(label, True, True, 0)
         box.pack_end(unpair_btn, False, False, 0)
+
+        row.add(box)
+        return row
+
+    def _build_ignored_row(self, name, info):
+        row = Gtk.ListBoxRow()
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        box.set_margin_top(4)
+        box.set_margin_bottom(4)
+
+        label = Gtk.Label(label=f"{name.split('.')[0]}  ({info['ip']}:{info['port']})")
+        label.set_xalign(0)
+        label.set_hexpand(True)
+
+        reconsider_btn = Gtk.Button(label="Reconsider")
+        reconsider_btn.connect("clicked", self._make_status_handler(name, "pending"))
+
+        box.pack_start(label, True, True, 0)
+        box.pack_end(reconsider_btn, False, False, 0)
 
         row.add(box)
         return row
