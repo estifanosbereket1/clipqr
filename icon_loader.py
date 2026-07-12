@@ -3,7 +3,10 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GdkPixbuf
 
-ICON_DIR = "assets/icons"
+import os
+
+ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icons")
+
 
 
 def load_icon(name: str, size: int = 18) -> Gtk.Image:
