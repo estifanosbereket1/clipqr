@@ -5,6 +5,10 @@ from pathlib import Path
 
 from content_detector import detect_type
 
+from rapidfuzz import fuzz
+
+FUZZY_MATCH_THRESHOLD = 60
+
 
 def get_db_path():
     base_path = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
@@ -185,16 +189,37 @@ def clear_history():
         cur = conn.cursor()
         cur.execute("DELETE FROM history")
 
+# def search_entries(query: str, limit: int = 50):
+#     with get_connection() as conn:
+#         cur = conn.cursor()
+#         return cur.execute(
+#             """
+#             SELECT * FROM history
+#             WHERE content LIKE ? COLLATE NOCASE
+#               AND pinned = 0
+#             ORDER BY created_at DESC
+#             LIMIT ?
+#             """,
+#             (f"%{query}%", limit),
+#         ).fetchall()
+
 def search_entries(query: str, limit: int = 50):
+    """
+    Fuzzy-searches history for entries similar to the query, so typos and
+    near-misses still match. Scores every candidate against the query and
+    returns matches above FUZZY_MATCH_THRESHOLD, best matches first.
+    """
     with get_connection() as conn:
         cur = conn.cursor()
-        return cur.execute(
-            """
-            SELECT * FROM history
-            WHERE content LIKE ? COLLATE NOCASE
-              AND pinned = 0
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (f"%{query}%", limit),
+        candidates = cur.execute(
+            "SELECT * FROM history WHERE pinned = 0 ORDER BY created_at DESC LIMIT 500"
         ).fetchall()
+
+    scored = []
+    for row in candidates:
+        score = fuzz.partial_ratio(query.lower(), row["content"].lower())
+        if score >= FUZZY_MATCH_THRESHOLD:
+            scored.append((score, row))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [row for score, row in scored[:limit]]

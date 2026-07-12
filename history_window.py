@@ -3,6 +3,7 @@ import pyperclip
 
 gi.require_version("Gtk", "3.0")
 from datetime import datetime
+from icon_loader import load_icon
 
 from gi.repository import GLib, Gtk
 
@@ -192,6 +193,8 @@ class HistoryWindow(Gtk.Window):
         self.pinned_list_box.show_all()
         self.list_box.show_all()
 
+
+
     def _confirm_delete(self, entry) -> bool:
         dialog = Gtk.MessageDialog(
             transient_for=self,
@@ -248,12 +251,12 @@ class HistoryWindow(Gtk.Window):
         # --- NEW: time label + stale icon, grouped in their own small box ---
         time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         stale = is_stale(entry["created_at"])
+
         if stale:
-            stale_icon = Gtk.Image.new_from_icon_name(
-                "alarm-symbolic", Gtk.IconSize.MENU
-            )
+            stale_icon = load_icon("alarm-clock", size=14)
             stale_icon.set_tooltip_text("This entry may be stale")
             time_box.pack_start(stale_icon, False, False, 0)
+
 
         time_label = Gtk.Label(label=format_relative_time(entry["created_at"]))
         time_label.get_style_context().add_class("dim-label")
@@ -268,39 +271,36 @@ class HistoryWindow(Gtk.Window):
             text_label.get_style_context().add_class("dim-label")
 
         if previous_entry is not None:
-            diff_button = self._icon_button(
-                "view-list-symbolic", "Compare with previous entry"
-            )
+            diff_button = self._icon_button("git-compare", "Compare with previous entry")
             diff_button.connect(
                 "clicked", self._make_diff_handler(entry, previous_entry)
             )
             row_box.pack_end(diff_button, False, False, 0)
 
-        pin_icon = "starred-symbolic" if is_pinned else "non-starred-symbolic"
+
+        pin_icon = "star-filled" if is_pinned else "star"
         pin_tooltip = "Unpin" if is_pinned else "Pin (max 5)"
         pin_button = self._icon_button(pin_icon, pin_tooltip)
         pin_button.connect("clicked", self._make_pin_handler(entry, is_pinned))
 
-        burn_icon = (
-            "edit-clear-all-symbolic"
-            if entry["self_destruct"]
-            else "edit-clear-symbolic"
-        )
+        burn_icon = "flame"
         burn_tooltip = (
             "Self-destruct: ON (copy will auto-delete + wipe clipboard)"
             if entry["self_destruct"]
             else "Mark as self-destruct"
         )
         burn_button = self._icon_button(burn_icon, burn_tooltip)
+
+
         burn_button.connect("clicked", self._make_burn_toggle_handler(entry))
 
-        qr_button = self._icon_button("view-grid-symbolic", "Show QR code")
+        qr_button = self._icon_button("qr-code", "Show QR code")
         qr_button.connect("clicked", self._make_qr_handler(entry))
 
-        copy_button = self._icon_button("edit-copy-symbolic", "Copy to clipboard")
+        copy_button = self._icon_button("copy", "Copy to clipboard")
         copy_button.connect("clicked", self._make_copy_handler(entry))
 
-        delete_button = self._icon_button("user-trash-symbolic", "Delete entry")
+        delete_button = self._icon_button("trash-2", "Delete entry")
         delete_button.connect("clicked", self._make_delete_handler(entry))
 
         row_box.pack_start(text_label, True, True, 0)
@@ -314,11 +314,9 @@ class HistoryWindow(Gtk.Window):
         return row
 
 
-
     def _icon_button(self, icon_name, tooltip):
         button = Gtk.Button()
-        icon = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.BUTTON)
-        button.set_image(icon)
+        button.set_image(load_icon(icon_name))
         button.set_tooltip_text(tooltip)
         return button
 
