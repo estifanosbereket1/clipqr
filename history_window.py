@@ -60,6 +60,8 @@ def truncate(text: str, max_len: int = 60) -> str:
 class HistoryWindow(Gtk.Window):
     def __init__(self, on_qr_clicked=None):
         super().__init__(title="Clipboard History")
+        self.compare_mode = False
+        self.selected_for_compare = []
         self.on_qr_clicked = on_qr_clicked
 
         self.set_default_size(420, 520)
@@ -79,6 +81,17 @@ class HistoryWindow(Gtk.Window):
         header.pack_start(title_label, True, True, 0)
         header.pack_end(refresh_btn, False, False, 0)
         outer_box.pack_start(header, False, False, 0)
+
+        compare_toggle_btn = Gtk.Button(label="Compare Mode")
+        compare_toggle_btn.connect("clicked", self.on_toggle_compare_mode)
+        header.pack_end(compare_toggle_btn, False, False, 0)
+        self.compare_toggle_btn = compare_toggle_btn
+
+        self.compare_selected_btn = Gtk.Button(label="Compare Selected")
+        self.compare_selected_btn.set_sensitive(False)
+        self.compare_selected_btn.connect("clicked", self.on_compare_selected_clicked)
+        self.compare_selected_btn.hide()
+        outer_box.pack_start(self.compare_selected_btn, False, False, 0)
 
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.set_placeholder_text("Search clipboard history...")
@@ -125,6 +138,34 @@ class HistoryWindow(Gtk.Window):
 
     def on_search_changed(self, _entry):
         self.refresh()
+
+    def on_toggle_compare_mode(self, _button):
+        self.compare_mode = not self.compare_mode
+        self.selected_for_compare = []
+        self.compare_toggle_btn.set_label(
+            "Exit Compare Mode" if self.compare_mode else "Compare Mode"
+        )
+        self.compare_selected_btn.set_visible(self.compare_mode)
+        self.compare_selected_btn.set_sensitive(False)
+        self.refresh()
+
+    def on_compare_selected_clicked(self, _button):
+        if len(self.selected_for_compare) != 2:
+            return
+        ordered = sorted(self.selected_for_compare, key=lambda e: e["created_at"])
+        DiffPopup(ordered[0]["content"], ordered[1]["content"])
+
+    def _make_compare_checkbox_handler(self, entry):
+        def handler(checkbox):
+            if checkbox.get_active():
+                self.selected_for_compare.append(entry)
+            else:
+                self.selected_for_compare = [
+                    e for e in self.selected_for_compare if e["id"] != entry["id"]
+                ]
+            self.compare_selected_btn.set_sensitive(len(self.selected_for_compare) == 2)
+            self.refresh()
+        return handler
 
     def _get_search_query(self) -> str:
         return self.search_entry.get_text().strip()
@@ -239,7 +280,7 @@ class HistoryWindow(Gtk.Window):
         row_box.set_margin_start(6)
         row_box.set_margin_end(6)
 
-        # --- NEW: badge ---
+        # --- badge ---
         badge_text = self._format_badge(entry["content_type"])
         if entry["origin"] != "local":
             peer_label_text = entry["origin"].split(".")[0]  # strip the .local. suffix etc, just show hostname
@@ -247,17 +288,13 @@ class HistoryWindow(Gtk.Window):
             origin_label.get_style_context().add_class("dim-label")
             row_box.pack_start(origin_label, False, False, 0)
 
-
-        # --- NEW: time label + stale icon, grouped in their own small box ---
+        # --- time label + stale icon, grouped in their own small box ---
         time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         stale = is_stale(entry["created_at"])
-
         if stale:
             stale_icon = load_icon("alarm-clock", size=14)
             stale_icon.set_tooltip_text("This entry may be stale")
             time_box.pack_start(stale_icon, False, False, 0)
-
-
         time_label = Gtk.Label(label=format_relative_time(entry["created_at"]))
         time_label.get_style_context().add_class("dim-label")
         time_box.pack_start(time_label, False, False, 0)
@@ -267,59 +304,139 @@ class HistoryWindow(Gtk.Window):
         text_label.set_xalign(0)
         text_label.set_hexpand(True)
         text_label.set_ellipsize(3)
-        if stale:  # --- NEW: dim the preview text too when stale ---
+        if stale:
             text_label.get_style_context().add_class("dim-label")
 
-        if previous_entry is not None:
-            diff_button = self._icon_button("git-compare", "Compare with previous entry")
-            diff_button.connect(
-                "clicked", self._make_diff_handler(entry, previous_entry)
-            )
-            row_box.pack_end(diff_button, False, False, 0)
-
-
-        pin_icon = "star-filled" if is_pinned else "star"
-        pin_tooltip = "Unpin" if is_pinned else "Pin (max 5)"
-        pin_button = self._icon_button(pin_icon, pin_tooltip)
-        pin_button.connect("clicked", self._make_pin_handler(entry, is_pinned))
-
-        burn_icon = "flame-active" if entry["self_destruct"] else "flame"
-        burn_tooltip = (
-            "Self-destruct: ON (copy will auto-delete + wipe clipboard)"
-            if entry["self_destruct"]
-            else "Mark as self-destruct"
-        )
-        burn_button = self._icon_button(burn_icon, burn_tooltip)
-
-        # burn_icon = "flame"
-        # burn_tooltip = (
-        #     "Self-destruct: ON (copy will auto-delete + wipe clipboard)"
-        #     if entry["self_destruct"]
-        #     else "Mark as self-destruct"
-        # )
-        # burn_button = self._icon_button(burn_icon, burn_tooltip)
-
-
-        burn_button.connect("clicked", self._make_burn_toggle_handler(entry))
-
-        qr_button = self._icon_button("qr-code", "Show QR code")
-        qr_button.connect("clicked", self._make_qr_handler(entry))
-
-        copy_button = self._icon_button("copy", "Copy to clipboard")
-        copy_button.connect("clicked", self._make_copy_handler(entry))
-
-        delete_button = self._icon_button("trash-2", "Delete entry")
-        delete_button.connect("clicked", self._make_delete_handler(entry))
-
         row_box.pack_start(text_label, True, True, 0)
-        row_box.pack_end(burn_button, False, False, 0)
-        row_box.pack_end(delete_button, False, False, 0)
-        row_box.pack_end(copy_button, False, False, 0)
-        row_box.pack_end(qr_button, False, False, 0)
-        row_box.pack_end(pin_button, False, False, 0)
+
+        if self.compare_mode:
+            checkbox = Gtk.CheckButton()
+            is_selected = any(e["id"] == entry["id"] for e in self.selected_for_compare)
+            checkbox.set_active(is_selected)
+            if len(self.selected_for_compare) >= 2 and not is_selected:
+                checkbox.set_sensitive(False)
+            checkbox.connect("toggled", self._make_compare_checkbox_handler(entry))
+            row_box.pack_end(checkbox, False, False, 0)
+        else:
+            if previous_entry is not None:
+                diff_button = self._icon_button("git-compare", "Compare with previous entry")
+                diff_button.connect(
+                    "clicked", self._make_diff_handler(entry, previous_entry)
+                )
+                row_box.pack_end(diff_button, False, False, 0)
+
+            pin_icon = "star-filled" if is_pinned else "star"
+            pin_tooltip = "Unpin" if is_pinned else "Pin (max 5)"
+            pin_button = self._icon_button(pin_icon, pin_tooltip)
+            pin_button.connect("clicked", self._make_pin_handler(entry, is_pinned))
+
+            burn_icon = "flame-active" if entry["self_destruct"] else "flame"
+            burn_tooltip = (
+                "Self-destruct: ON (copy will auto-delete + wipe clipboard)"
+                if entry["self_destruct"]
+                else "Mark as self-destruct"
+            )
+            burn_button = self._icon_button(burn_icon, burn_tooltip)
+            burn_button.connect("clicked", self._make_burn_toggle_handler(entry))
+
+            qr_button = self._icon_button("qr-code", "Show QR code")
+            qr_button.connect("clicked", self._make_qr_handler(entry))
+
+            copy_button = self._icon_button("copy", "Copy to clipboard")
+            copy_button.connect("clicked", self._make_copy_handler(entry))
+
+            delete_button = self._icon_button("trash-2", "Delete entry")
+            delete_button.connect("clicked", self._make_delete_handler(entry))
+
+            row_box.pack_end(burn_button, False, False, 0)
+            row_box.pack_end(delete_button, False, False, 0)
+            row_box.pack_end(copy_button, False, False, 0)
+            row_box.pack_end(qr_button, False, False, 0)
+            row_box.pack_end(pin_button, False, False, 0)
 
         row.add(row_box)
         return row
+
+    # def _build_row(self, entry, is_pinned: bool, previous_entry=None) -> Gtk.ListBoxRow:
+    #     row = Gtk.ListBoxRow()
+    #     row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    #     row_box.set_margin_top(4)
+    #     row_box.set_margin_bottom(4)
+    #     row_box.set_margin_start(6)
+    #     row_box.set_margin_end(6)
+
+    #     # --- NEW: badge ---
+    #     badge_text = self._format_badge(entry["content_type"])
+    #     if entry["origin"] != "local":
+    #         peer_label_text = entry["origin"].split(".")[0]  # strip the .local. suffix etc, just show hostname
+    #         origin_label = Gtk.Label(label=f"↴ {peer_label_text}")
+    #         origin_label.get_style_context().add_class("dim-label")
+    #         row_box.pack_start(origin_label, False, False, 0)
+
+
+    #     # --- NEW: time label + stale icon, grouped in their own small box ---
+    #     time_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+    #     stale = is_stale(entry["created_at"])
+
+    #     if stale:
+    #         stale_icon = load_icon("alarm-clock", size=14)
+    #         stale_icon.set_tooltip_text("This entry may be stale")
+    #         time_box.pack_start(stale_icon, False, False, 0)
+
+
+    #     time_label = Gtk.Label(label=format_relative_time(entry["created_at"]))
+    #     time_label.get_style_context().add_class("dim-label")
+    #     time_box.pack_start(time_label, False, False, 0)
+    #     row_box.pack_start(time_box, False, False, 0)
+
+    #     text_label = Gtk.Label(label=truncate(entry["content"]))
+    #     text_label.set_xalign(0)
+    #     text_label.set_hexpand(True)
+    #     text_label.set_ellipsize(3)
+    #     if stale:  # --- NEW: dim the preview text too when stale ---
+    #         text_label.get_style_context().add_class("dim-label")
+
+    #     if previous_entry is not None:
+    #         diff_button = self._icon_button("git-compare", "Compare with previous entry")
+    #         diff_button.connect(
+    #             "clicked", self._make_diff_handler(entry, previous_entry)
+    #         )
+    #         row_box.pack_end(diff_button, False, False, 0)
+
+
+    #     pin_icon = "star-filled" if is_pinned else "star"
+    #     pin_tooltip = "Unpin" if is_pinned else "Pin (max 5)"
+    #     pin_button = self._icon_button(pin_icon, pin_tooltip)
+    #     pin_button.connect("clicked", self._make_pin_handler(entry, is_pinned))
+
+    #     burn_icon = "flame-active" if entry["self_destruct"] else "flame"
+    #     burn_tooltip = (
+    #         "Self-destruct: ON (copy will auto-delete + wipe clipboard)"
+    #         if entry["self_destruct"]
+    #         else "Mark as self-destruct"
+    #     )
+    #     burn_button = self._icon_button(burn_icon, burn_tooltip)
+
+    #     burn_button.connect("clicked", self._make_burn_toggle_handler(entry))
+
+    #     qr_button = self._icon_button("qr-code", "Show QR code")
+    #     qr_button.connect("clicked", self._make_qr_handler(entry))
+
+    #     copy_button = self._icon_button("copy", "Copy to clipboard")
+    #     copy_button.connect("clicked", self._make_copy_handler(entry))
+
+    #     delete_button = self._icon_button("trash-2", "Delete entry")
+    #     delete_button.connect("clicked", self._make_delete_handler(entry))
+
+    #     row_box.pack_start(text_label, True, True, 0)
+    #     row_box.pack_end(burn_button, False, False, 0)
+    #     row_box.pack_end(delete_button, False, False, 0)
+    #     row_box.pack_end(copy_button, False, False, 0)
+    #     row_box.pack_end(qr_button, False, False, 0)
+    #     row_box.pack_end(pin_button, False, False, 0)
+
+    #     row.add(row_box)
+    #     return row
 
 
     def _icon_button(self, icon_name, tooltip):
