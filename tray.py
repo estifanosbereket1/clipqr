@@ -5,7 +5,7 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3, Gtk
 
 
-def setup_tray_icon(on_open, on_settings, on_playback, on_peers, on_quit, on_check_updates):
+def setup_tray_icon(on_open, on_settings, on_playback, on_peers, on_quit, on_check_updates, on_about, on_uninstall):
     """
     Creates and shows the system tray icon with a right-click menu:
       - Open Clipboard History -> calls on_open()
@@ -28,6 +28,8 @@ def setup_tray_icon(on_open, on_settings, on_playback, on_peers, on_quit, on_che
     open_item.connect("activate", lambda _item: on_open())
     menu.append(open_item)
 
+
+
     settings_item = Gtk.MenuItem(label="Settings")
     settings_item.connect("activate", lambda _item: on_settings())
     menu.append(settings_item)
@@ -46,6 +48,14 @@ def setup_tray_icon(on_open, on_settings, on_playback, on_peers, on_quit, on_che
     update_item = Gtk.MenuItem(label="Check for Updates")
     update_item.connect("activate", lambda _item: on_check_updates())
     menu.append(update_item)
+
+    about_item = Gtk.MenuItem(label="About ClipVault")
+    about_item.connect("activate", lambda _item: on_about())
+    menu.append(about_item)
+
+    uninstall_item = Gtk.MenuItem(label="Uninstall ClipVault")
+    uninstall_item.connect("activate", lambda _item: on_uninstall())
+    menu.append(uninstall_item)
 
     quit_item = Gtk.MenuItem(label="Quit")
     quit_item.connect("activate", lambda _item: on_quit())

@@ -104,6 +104,10 @@ def main():
         def open_playback():
             PlaybackWindow()
 
+        def open_about():
+            from about_window import AboutWindow
+            AboutWindow()
+
         def on_clipboard_changed():
             GLib.idle_add(history_window.refresh)
 
@@ -230,6 +234,8 @@ def main():
             on_peers=open_peers,
             on_quit=quit_app,
             on_check_updates=on_check_updates,
+            on_about=open_about,
+            on_uninstall=on_uninstall_clicked
         )
         app_refs["indicator"] = indicator
 
