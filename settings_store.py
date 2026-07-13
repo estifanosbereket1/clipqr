@@ -12,6 +12,7 @@ DEFAULTS = {
     # "palette": "midnight",
     "dark_palette": "midnight",
     "light_palette": "daylight",
+    "onboarded": False
 }
 
 # Bounds used for validation when saving.
