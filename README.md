@@ -1,6 +1,6 @@
 # ClipVault
 
-A clipboard manager for Ubuntu/Linux Mint with a tray icon, a global hotkey, and a QR-code feature for copying clipboard entries directly to your phone by scanning. Includes LAN peer sync, clipboard diffing, content-type detection, theming, and more — all fully local, nothing ever touches a cloud server.
+A clipboard manager for Ubuntu/Linux Mint with a tray icon, a global hotkey, and a QR-code feature for copying clipboard entries directly to your phone by scanning. Includes LAN peer sync, clipboard diffing, content-type detection, theming, and more , all fully local, nothing ever touches a cloud server.
 
 **Your clipboard, everywhere. Never in the cloud.**
 
@@ -12,9 +12,9 @@ A clipboard manager for Ubuntu/Linux Mint with a tray icon, a global hotkey, and
 - Automatic content-type detection (JSON, JWT, URLs, UUIDs, code snippets, etc.) with badges
 - Staleness warnings on older entries
 - Burn-after-copy for sensitive one-time values (auto-wipes clipboard after use)
-- Line-level diffing between clipboard entries — chronological or any two you pick
+- Line-level diffing between clipboard entries , chronological or any two you pick
 - Visual clipboard playback timeline
-- LAN peer sync — automatically discover and sync clipboard history with your other devices
+- LAN peer sync , automatically discover and sync clipboard history with your other devices
 - QR-to-QR chaining for offline device-to-device sharing
 - Full theming system (multiple dark/light palettes, auto-matches your system theme)
 - First-run setup wizard, auto-updates, and a clean uninstaller
@@ -28,7 +28,7 @@ The fastest way to install:
 curl -fsSL https://raw.githubusercontent.com/estifanosbereket1/clipvault/main/bootstrap.sh | bash
 ```
 
-This clones the repo to `~/ClipVault`, installs all dependencies, sets up HTTPS certificates, configures autostart, and launches the app. The first time it runs, a setup wizard will walk you through choosing a theme, a port, hotkey, and phone access — all in under a minute.
+This clones the repo to `~/ClipVault`, installs all dependencies, sets up HTTPS certificates, configures autostart, and launches the app. The first time it runs, a setup wizard will walk you through choosing a theme, a port, hotkey, and phone access , all in under a minute.
 
 Re-running the same command later will update an existing install instead of duplicating it.
 
@@ -67,21 +67,21 @@ After that, you'll see the ClipVault icon in your system tray. Click it for the 
 If you skipped it during onboarding, or want to trust a new phone later:
 1. Make sure your phone is on the same Wi-Fi network as your computer
 2. Open **Settings** from the tray menu → **Show CA Setup QR**
-3. Scan it with your phone — this downloads a certificate file
-4. On Android: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate**, then select the downloaded file (this is a one-time step per phone — Android requires it to be done manually as a security measure)
-5. Once trusted, click the QR icon on any clipboard entry and scan it — the content auto-copies to your phone's clipboard
+3. Scan it with your phone —> this downloads a certificate file
+4. On Android: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate**, then select the downloaded file (this is a one-time step per phone —> Android requires it to be done manually as a security measure)
+5. Once trusted, click the QR icon on any clipboard entry and scan it —> the content auto-copies to your phone's clipboard
 
 ## LAN peer sync
 
 To sync clipboard history between two of your own computers on the same network:
 1. Run ClipVault on both machines
-2. Open **Peer Devices** from the tray menu on each — they'll discover each other automatically within a few seconds
+2. Open **Peer Devices** from the tray menu on each —> they'll discover each other automatically within a few seconds
 3. Click **Approve** on both sides to pair
 4. Clipboard entries sync automatically both ways from then on (pinned and self-destruct entries are never synced)
 
 ## Updating
 
-ClipVault checks GitHub Releases for new versions. Click **Check for Updates** in the tray menu — if one's available, it'll pull the latest code, reinstall dependencies, and restart automatically. Your clipboard history and settings are never touched by an update.
+ClipVault checks GitHub Releases for new versions. Click **Check for Updates** in the tray menu , if one's available, it'll pull the latest code, reinstall dependencies, and restart automatically. Your clipboard history and settings are never touched by an update.
 
 ## Uninstalling
 
@@ -101,7 +101,7 @@ All settings are available in the Settings window, or editable directly at `~/.c
 
 ## Known limitations
 
-- **LAN only.** Phone sync and peer sync require devices to be on the same local network — a deliberate choice to keep clipboard data off any third-party server.
+- **LAN only.** Phone sync and peer sync require devices to be on the same local network , a deliberate choice to keep clipboard data off any third-party server.
 - **Self-signed certificates.** Each machine generates its own certificate. Phones need a one-time manual trust step; peer-to-peer sync between your own computers skips certificate verification entirely, since both ends are your own trusted devices.
 - **IP changes.** If your computer's LAN IP changes, ClipVault detects this automatically and regenerates its certificate. Existing phone QR codes will need to be regenerated (just reopen the QR for that entry) since they encode the old IP.
 - **Wayland hotkey limitation.** ClipVault works around Wayland's global-hotkey restrictions by having GNOME run a shell command on your registered key combo, which signals the running process. This works on both X11 and Wayland.
@@ -147,4 +147,4 @@ uninstall.sh                  # uninstaller
 main.py                        # entry point, wires everything together
 ```
 
-Setting `GITHUB_TOKEN` as an environment variable raises the update checker's rate limit from 60 to 5000 requests/hour — useful during development, not required for normal use.
+Setting `GITHUB_TOKEN` as an environment variable raises the update checker's rate limit from 60 to 5000 requests/hour , useful during development, not required for normal use.
