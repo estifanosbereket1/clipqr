@@ -36,13 +36,9 @@ def main():
 
     app_refs = {}
 
-    def continue_startup():
+    def start_server_and_certs():
         from cert_manager import get_cert_dir, regenerate_cert_for_ip
         from settings_store import check_ip_changed, save_settings
-        from theme_manager import apply_theme_for_current_system_mode, watch_system_theme_changes
-
-        apply_theme_for_current_system_mode()
-        app_refs["theme_watcher"] = watch_system_theme_changes()
 
         changed, old_ip, new_ip = check_ip_changed()
         if changed and new_ip:
@@ -54,6 +50,26 @@ def main():
         cert_dir = get_cert_dir()
         cert_path = str(cert_dir / "cert.pem")
         key_path = str(cert_dir / "key.pem")
+
+        threading.Thread(
+            target=uvicorn.run,
+            kwargs={
+                "app": qr_app,
+                "host": "0.0.0.0",
+                "port": settings["port"],
+                "ssl_keyfile": key_path,
+                "ssl_certfile": cert_path,
+            },
+            daemon=True,
+        ).start()
+
+    def finish_startup():
+        from theme_manager import apply_theme_for_current_system_mode, watch_system_theme_changes
+
+        apply_theme_for_current_system_mode()
+        app_refs["theme_watcher"] = watch_system_theme_changes()
+
+        settings = load_settings()
 
         def on_check_updates():
             from update_checker import check_for_update
@@ -91,7 +107,7 @@ def main():
             )
             confirm.format_secondary_text(
                 f"You're on v{result['local_version']}. Update now? "
-                "ClipQR will restart automatically; your clipboard history and settings are kept."
+                "ClipVault will restart automatically; your clipboard history and settings are kept."
             )
             response = confirm.run()
             confirm.destroy()
@@ -193,18 +209,6 @@ def main():
             daemon=True,
         ).start()
 
-        threading.Thread(
-            target=uvicorn.run,
-            kwargs={
-                "app": qr_app,
-                "host": "0.0.0.0",
-                "port": settings["port"],
-                "ssl_keyfile": key_path,
-                "ssl_certfile": cert_path,
-            },
-            daemon=True,
-        ).start()
-
         history_window = HistoryWindow(on_qr_clicked=open_qr_popup)
 
         def show_history_window():
@@ -235,13 +239,21 @@ def main():
             on_quit=quit_app,
             on_check_updates=on_check_updates,
             on_about=open_about,
-            on_uninstall=on_uninstall_clicked
+            on_uninstall=on_uninstall_clicked,
         )
         app_refs["indicator"] = indicator
 
+    def continue_startup():
+        start_server_and_certs()
+        finish_startup()
+
     settings_check = load_settings()
     if not settings_check.get("onboarded", False):
-        OnboardingWizard(on_complete=continue_startup)
+        def after_wizard():
+            finish_startup()
+
+        start_server_and_certs()
+        OnboardingWizard(on_complete=after_wizard)
     else:
         continue_startup()
 

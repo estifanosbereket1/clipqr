@@ -22,7 +22,7 @@ class OnboardingWizard(Gtk.Window):
         self.set_can_focus(True)
         self.connect("key-press-event", self.on_wizard_key_press)
 
-        self.step_names = ["welcome", "theme", "port", "hotkey", "done"]
+        self.step_names = ["welcome", "theme", "phone","port", "hotkey", "done"]
         self.current_step_index = 0
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -39,14 +39,12 @@ class OnboardingWizard(Gtk.Window):
         outer.pack_start(self.stack, True, True, 0)
 
         self._build_welcome_page()
-        # self._build_placeholder_page("theme", "Theme step coming soon")
         self._build_theme_page()
-        # self._build_placeholder_page("port", "Port step coming soon")
         self._build_port_page()
-        # self._build_placeholder_page("hotkey", "Hotkey step coming soon")
         self._build_hotkey_page()
-        # self._build_placeholder_page("done", "Done step coming soon")
-        self._build_done_page()
+        self._build_phone_page()
+        # self._build_done_page()
+        self._build_placeholder_page("done", "Done step coming soon")
 
         nav_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.back_button = Gtk.Button(label="Back")
@@ -110,32 +108,60 @@ class OnboardingWizard(Gtk.Window):
 
         self.stack.add_named(page, "welcome")
 
+    def _build_phone_page(self):
+        from qr_popup import generate_qr_for_url
+        from settings_store import load_settings
+
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        page.set_border_width(10)
+
+        title = Gtk.Label()
+        title.set_markup("<span size='large' weight='bold'>Set up phone access</span>")
+        title.set_halign(Gtk.Align.START)
+        page.pack_start(title, False, False, 0)
+
+        subtitle = Gtk.Label(
+            label="To copy clipboard entries straight to your phone by scanning "
+                  "a QR code, your phone needs to trust this computer once. "
+                  "This is optional — you can skip it and set it up later."
+        )
+        subtitle.set_line_wrap(True)
+        subtitle.get_style_context().add_class("dim-label")
+        subtitle.set_halign(Gtk.Align.START)
+        page.pack_start(subtitle, False, False, 6)
+
+        settings = load_settings()
+        port = self.selected_port or settings["port"]
+        url = f"https://{settings['last_known_ip']}:{port}/setup-ca"
+
+        try:
+            image_path = generate_qr_for_url(url, "onboarding-ca-setup")
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(image_path, 180, 180, True)
+            qr_image = Gtk.Image.new_from_pixbuf(pixbuf)
+            qr_image.set_halign(Gtk.Align.CENTER)
+            page.pack_start(qr_image, False, False, 10)
+        except Exception as e:
+            error_label = Gtk.Label(label=f"Couldn't generate QR code: {e}")
+            error_label.set_line_wrap(True)
+            page.pack_start(error_label, False, False, 10)
+
+        instructions = Gtk.Label(
+            label="Scan this with your phone, then go to:\n"
+                  "Settings → Security → Encryption & credentials → Install a certificate\n"
+                  "→ CA certificate, and select the downloaded file."
+        )
+        instructions.set_justify(Gtk.Justification.CENTER)
+        instructions.get_style_context().add_class("dim-label")
+        page.pack_start(instructions, False, False, 6)
+
+        self.stack.add_named(page, "phone")
+
     def _build_done_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         page.set_border_width(10)
         self.stack.add_named(page, "done")
 
-    # def _build_done_page(self):
-    #     from icon_loader import load_icon
 
-    #     page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-    #     page.set_border_width(10)
-
-    #     check_icon = load_icon("copy", size=48)  # placeholder; swap for a checkmark icon once you have one
-    #     check_icon.set_halign(Gtk.Align.CENTER)
-    #     page.pack_start(check_icon, False, False, 10)
-
-    #     title = Gtk.Label()
-    #     title.set_markup("<span size='x-large' weight='bold'>You're all set!</span>")
-    #     title.set_halign(Gtk.Align.CENTER)
-    #     page.pack_start(title, False, False, 0)
-
-    #     summary = Gtk.Label(label=self._build_summary_text())
-    #     summary.set_line_wrap(True)
-    #     summary.set_xalign(0)
-    #     page.pack_start(summary, False, False, 10)
-
-    #     self.stack.add_named(page, "done")
 
     def _build_summary_text(self):
         theme_name = self.theme_picker.selected_palette.title() if hasattr(self, "theme_picker") else "default"
@@ -148,6 +174,18 @@ class OnboardingWizard(Gtk.Window):
             f"Hotkey: {hotkey}\n\n"
             "Click \"Get Started\" to open your clipboard history."
         )
+
+    # def _build_summary_text(self):
+    #     theme_name = self.theme_picker.selected_palette.title() if hasattr(self, "theme_picker") else "default"
+    #     port = self.selected_port if self.selected_port else "default"
+    #     hotkey = self.captured_hotkey_accelerator or "not set (can be added later in Settings)"
+
+    #     return (
+    #         f"Theme: {theme_name}\n"
+    #         f"Port: {port}\n"
+    #         f"Hotkey: {hotkey}\n\n"
+    #         "Click \"Get Started\" to open your clipboard history."
+    #     )
 
     def _build_hotkey_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)

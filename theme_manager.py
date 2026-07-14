@@ -64,6 +64,9 @@ def build_css(palette: dict) -> str:
     separator {{
         background-color: {palette['border']};
     }}
+    menuitem.uninstall-menu-item label {{
+        color: {palette['error']};
+    }}
     """
 
 
