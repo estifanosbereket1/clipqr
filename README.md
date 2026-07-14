@@ -1,153 +1,95 @@
-# ClipQR
+# ClipVault
 
-A clipboard manager for Ubuntu/Linux Mint with a tray icon, a global hotkey, and a QR-code feature for copying clipboard entries directly to your phone's clipboard by scanning. Includes LAN peer sync, clipboard diffing, content-type detection, and more.
+A clipboard manager for Ubuntu/Linux Mint with a tray icon, a global hotkey, and a QR-code feature for copying clipboard entries directly to your phone by scanning. Includes LAN peer sync, clipboard diffing, content-type detection, theming, and more — all fully local, nothing ever touches a cloud server.
+
+**Your clipboard, everywhere. Never in the cloud.**
 
 ## Features
 
-- System tray clipboard history with pin, delete, copy, and search
-- Scan a QR code to auto-copy any entry to your phone's clipboard (HTTPS, local network only)
+- System tray clipboard history with pin, delete, copy, and fuzzy search
+- Scan a QR code to auto-copy any entry to your phone's clipboard (local HTTPS, LAN only)
 - Global hotkey to open the history window (works on both X11 and Wayland)
-- Automatic content-type detection (JSON, JWT, URLs, UUIDs, code snippets, etc.)
+- Automatic content-type detection (JSON, JWT, URLs, UUIDs, code snippets, etc.) with badges
 - Staleness warnings on older entries
-- Burn-after-copy for sensitive one-time values
-- Line-level diffing between clipboard entries
+- Burn-after-copy for sensitive one-time values (auto-wipes clipboard after use)
+- Line-level diffing between clipboard entries — chronological or any two you pick
 - Visual clipboard playback timeline
-- LAN peer sync — automatically discover and sync clipboard history with other ClipQR instances on your network
+- LAN peer sync — automatically discover and sync clipboard history with your other devices
+- QR-to-QR chaining for offline device-to-device sharing
+- Full theming system (multiple dark/light palettes, auto-matches your system theme)
+- First-run setup wizard, auto-updates, and a clean uninstaller
 - Fully configurable: history limit, poll interval, port, playback mode
 
-## Prerequisites
+## Install
 
-- Ubuntu 22.04+, Linux Mint, or another GTK3-based Linux desktop
-- Python 3.10+
-- A desktop environment with a system tray (Ubuntu ships this by default; other GNOME-based distros may need the "AppIndicator and KStatusNotifierItem Support" extension)
-
-## 1. System dependencies
+The fastest way to install:
 
 ```bash
-sudo apt update
-sudo apt install \
-  python3-venv python3-pip git \
-  python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 \
-  xclip \
-  libnss3-tools
+curl -fsSL https://raw.githubusercontent.com/estifanosbereket1/clipvault/main/bootstrap.sh | bash
 ```
 
-- `python3-gi` / `gir1.2-gtk-3.0` / `gir1.2-ayatanaappindicator3-0.1` — GTK3 and tray icon bindings
-- `xclip` — required by the clipboard read/write library on X11 (for Wayland, use `wl-clipboard` instead)
-- `libnss3-tools` — required by `mkcert` for managing trusted certificates
+This clones the repo to `~/ClipVault`, installs all dependencies, sets up HTTPS certificates, configures autostart, and launches the app. The first time it runs, a setup wizard will walk you through choosing a theme, a port, hotkey, and phone access — all in under a minute.
 
-## 2. Install mkcert
+Re-running the same command later will update an existing install instead of duplicating it.
 
-ClipQR uses [mkcert](https://github.com/FiloSottile/mkcert) to generate locally-trusted HTTPS certificates, required for the phone's browser to auto-copy via the Clipboard API.
+### What the installer does under the hood
+
+- Installs system dependencies (GTK bindings, `xclip`, `mkcert`, etc.)
+- Creates a Python virtual environment and installs pinned dependencies
+- Sets up a local HTTPS certificate authority via `mkcert`
+- Registers a systemd user service so ClipVault starts on login and restarts if it crashes
+- Adds a `.desktop` entry so it launches like any normal app, no terminal required after install
+
+### Manual install
+
+If you'd rather not pipe a script into bash, you can do it step by step:
 
 ```bash
-curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
-chmod +x mkcert-v*-linux-amd64
-sudo mv mkcert-v*-linux-amd64 /usr/local/bin/mkcert
-mkcert -install
+git clone https://github.com/estifanosbereket1/clipvault.git
+cd clipvault
+chmod +x install.sh
+./install.sh
 ```
 
-`mkcert -install` creates a local Certificate Authority (CA) and trusts it on this machine. You'll separately trust it on your phone later (see step 7).
+## First run
 
-## 3. Clone and set up the project
+The setup wizard walks you through:
+1. A quick intro to what ClipVault does
+2. Choosing a color theme (only palettes matching your system's dark/light mode are shown)
+3. Picking a port for the local HTTPS server (auto-checks for availability)
+4. Setting up phone access (scan a QR to trust this computer, one time per phone)
+5. Setting your global hotkey
 
-GTK bindings are system packages, not pip packages, so the virtual environment needs `--system-site-packages` to see them:
+After that, you'll see the ClipVault icon in your system tray. Click it for the full menu: Open Clipboard History, Clipboard Playback, Peer Devices, Settings, Check for Updates, About, and Uninstall.
 
-```bash
-git clone <this-repo-url> clipqr
-cd clipqr
-python3 -m venv venv --system-site-packages
-source venv/bin/activate
-pip install -r requirements.txt
-```
+## Phone setup
 
-## 4. First run
-
-```bash
-python3 main.py
-```
-
-On first run, ClipQR will:
-- Create its database at `~/.local/share/clipqr/history.db`
-- Create its settings file at `~/.config/clipqr/settings.json`
-- Detect your LAN IP and generate an HTTPS certificate for it automatically (via `mkcert`)
-- Start the tray icon, clipboard monitor, and local HTTPS server
-
-You should see a tray icon appear. Click it to see the menu: **Open Clipboard History**, **Settings**, **Clipboard Playback**, **Peer Devices**, and **Quit**.
-
-## 5. Set up the global hotkey
-
-Global hotkeys work differently depending on whether you're on X11 or Wayland — ClipQR handles this automatically via a Unix signal, but you need to register the actual key combination once:
-
-1. Open **Settings** from the tray menu
-2. Click into the "Press a key combo..." field and press your desired combination (e.g. `Ctrl+Alt+V`)
-3. If it says "Available," click **Save Shortcut**
-4. If it says "Already used by...", pick a different combination
-
-This registers a custom GNOME keyboard shortcut that signals the running ClipQR process to open the history window.
-
-## 6. Set up autostart (optional, recommended)
-
-To have ClipQR start automatically on login and restart if it crashes:
-
-```bash
-mkdir -p ~/.config/systemd/user
-```
-
-Create `~/.config/systemd/user/clipqr.service`:
-
-```ini
-[Unit]
-Description=ClipQR clipboard manager
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/path/to/clipqr/venv/bin/python3 /path/to/clipqr/main.py
-WorkingDirectory=/path/to/clipqr
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=graphical-session.target
-```
-
-Replace `/path/to/clipqr` with your actual project path (run `pwd` inside the project folder to get it).
-
-```bash
-systemctl --user daemon-reload
-systemctl --user enable clipqr.service
-systemctl --user start clipqr.service
-```
-
-Check it's running:
-```bash
-systemctl --user status clipqr.service
-```
-
-## 7. Set up your phone
-
-1. Make sure your phone is on the **same Wi-Fi network** as your computer
-2. In ClipQR's Settings window, click **Show CA Setup QR**
+If you skipped it during onboarding, or want to trust a new phone later:
+1. Make sure your phone is on the same Wi-Fi network as your computer
+2. Open **Settings** from the tray menu → **Show CA Setup QR**
 3. Scan it with your phone — this downloads a certificate file
-4. On Android: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate**, then select the downloaded file
-   - This is a one-time step per phone. It's required because Android blocks direct one-tap installation of CA certificates from downloaded files as a security measure.
-5. Once trusted, click the QR-code icon on any clipboard history entry and scan it with your phone — the content should auto-copy to your phone's clipboard
+4. On Android: **Settings → Security → Encryption & credentials → Install a certificate → CA certificate**, then select the downloaded file (this is a one-time step per phone — Android requires it to be done manually as a security measure)
+5. Once trusted, click the QR icon on any clipboard entry and scan it — the content auto-copies to your phone's clipboard
 
-## 8. LAN peer sync (optional)
+## LAN peer sync
 
-To sync clipboard history between two computers on the same network:
+To sync clipboard history between two of your own computers on the same network:
+1. Run ClipVault on both machines
+2. Open **Peer Devices** from the tray menu on each — they'll discover each other automatically within a few seconds
+3. Click **Approve** on both sides to pair
+4. Clipboard entries sync automatically both ways from then on (pinned and self-destruct entries are never synced)
 
-1. Run ClipQR on both machines (steps 1–4 above, on each)
-2. Open **Peer Devices** from the tray menu on both machines
-3. Each machine should discover the other automatically within a few seconds and list it under "Pending"
-4. Click **Approve** on both sides to pair
-5. Clipboard entries will now sync automatically, both directions, excluding pinned and self-destruct entries
+## Updating
+
+ClipVault checks GitHub Releases for new versions. Click **Check for Updates** in the tray menu — if one's available, it'll pull the latest code, reinstall dependencies, and restart automatically. Your clipboard history and settings are never touched by an update.
+
+## Uninstalling
+
+Click **Uninstall ClipVault** in the tray menu, or run `./uninstall.sh` from the project folder directly. You'll be asked separately whether to keep your clipboard history/settings and whether to remove the project folder itself.
 
 ## Configuration
 
-All settings are available in the Settings window, or editable directly at `~/.config/clipqr/settings.json`:
+All settings are available in the Settings window, or editable directly at `~/.config/clipvault/settings.json`:
 
 | Setting | Description | Default |
 |---|---|---|
@@ -155,39 +97,54 @@ All settings are available in the Settings window, or editable directly at `~/.c
 | `poll_interval` | Clipboard check frequency in seconds (restart required) | 1.0 |
 | `port` | Local HTTPS server port (restart required) | 8000 |
 | `playback_mode` | `"time"` (visual timeline) or `"index"` (simple slider) | `"time"` |
+| `dark_palette` / `light_palette` | Active theme per system mode | `"midnight"` / `"daylight"` |
 
 ## Known limitations
 
-- **LAN only.** Phone sync and peer sync require devices to be on the same local network. This is a deliberate design choice to keep clipboard data off any third-party servers.
-- **Self-signed certificates.** Since there's no public domain involved, each machine generates its own certificate. Phones need a one-time manual trust step (see step 7); peer-to-peer sync between computers skips certificate verification entirely, since both ends are your own trusted devices.
-- **IP changes.** If your computer's LAN IP changes (new network, DHCP lease renewal), ClipQR detects this automatically and regenerates its certificate. Peers will re-discover the new address within a few seconds; phone QR codes generated before an IP change will stop working and need to be regenerated (just reopen the QR for that entry).
-- **Wayland hotkey limitation.** Global hotkey capture libraries generally don't work on Wayland for security reasons. ClipQR works around this by having GNOME run a shell command (`kill -SIGUSR1 ...`) on your registered key combo, which signals the running process — this works on both X11 and Wayland, but does mean the hotkey is registered as a GNOME custom shortcut rather than being captured directly by the app.
+- **LAN only.** Phone sync and peer sync require devices to be on the same local network — a deliberate choice to keep clipboard data off any third-party server.
+- **Self-signed certificates.** Each machine generates its own certificate. Phones need a one-time manual trust step; peer-to-peer sync between your own computers skips certificate verification entirely, since both ends are your own trusted devices.
+- **IP changes.** If your computer's LAN IP changes, ClipVault detects this automatically and regenerates its certificate. Existing phone QR codes will need to be regenerated (just reopen the QR for that entry) since they encode the old IP.
+- **Wayland hotkey limitation.** ClipVault works around Wayland's global-hotkey restrictions by having GNOME run a shell command on your registered key combo, which signals the running process. This works on both X11 and Wayland.
 
-## Project structure
+## For developers
+
+Project structure:
 
 ```
-storage.py            # SQLite persistence layer
-clipboard_monitor.py  # background clipboard watcher
-history_window.py     # main GTK history UI
-qr_popup.py           # QR code generation
-qr_display.py         # QR popup window
-qr_server.py          # FastAPI HTTPS server for phone auto-copy
-hotkey.py              # Wayland-proof signal-based hotkey listener
-gnome_shortcuts.py     # GNOME custom keybinding registration
-settings_store.py      # JSON-backed app settings
-settings_window.py     # settings UI
-cert_manager.py        # mkcert certificate generation
+storage.py             # SQLite persistence layer
+clipboard_monitor.py   # background clipboard watcher
+history_window.py      # main GTK history UI
+qr_popup.py            # QR code generation
+qr_display.py          # QR popup window
+qr_server.py            # FastAPI HTTPS server for phone auto-copy
+hotkey.py               # Wayland-proof signal-based hotkey listener
+gnome_shortcuts.py      # GNOME custom keybinding registration
+settings_store.py       # JSON-backed app settings
+settings_window.py      # settings UI
+onboarding_wizard.py    # first-run setup wizard
+cert_manager.py         # mkcert certificate generation
 tray.py                 # system tray icon and menu
-peer_discovery.py      # mDNS peer discovery
+peer_discovery.py       # mDNS peer discovery
 peer_store.py           # peer pairing state
 peer_sync.py            # peer-to-peer sync protocol
 peer_window.py          # peer pairing UI
 content_detector.py     # clipboard content-type detection
-diff_utils.py            # text diffing logic
-diff_display.py          # diff popup window
-clipboard_wipe.py        # delayed clipboard-wipe for burn-after-copy
-playback_window.py       # clipboard playback UI
-timeline_widget.py       # custom-drawn playback timeline
-icon_loader.py            # bundled SVG icon loader
-main.py                    # entry point, wires everything together
+diff_utils.py           # text diffing logic
+diff_display.py         # diff popup window
+clipboard_wipe.py       # delayed clipboard-wipe for burn-after-copy
+playback_window.py      # clipboard playback UI
+timeline_widget.py      # custom-drawn playback timeline
+palettes.py             # color palette definitions
+theme_manager.py        # CSS theming + system dark/light detection
+palette_picker.py       # theme selection UI
+icon_loader.py           # bundled SVG icon loader
+about_window.py           # About window
+update_checker.py         # GitHub Releases-based update checker
+port_checker.py            # port availability checking for onboarding
+install.sh                  # automated installer
+bootstrap.sh                 # curl-friendly install entrypoint
+uninstall.sh                  # uninstaller
+main.py                        # entry point, wires everything together
 ```
+
+Setting `GITHUB_TOKEN` as an environment variable raises the update checker's rate limit from 60 to 5000 requests/hour — useful during development, not required for normal use.
