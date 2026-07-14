@@ -122,11 +122,17 @@ def main():
                 quit_app()
 
         def open_playback():
-            PlaybackWindow()
+            if "playback_window" not in app_refs or not app_refs["playback_window"].get_visible():
+                app_refs["playback_window"] = PlaybackWindow()
+            else:
+                app_refs["playback_window"].present()
 
         def open_about():
             from about_window import AboutWindow
-            AboutWindow()
+            if "about_window" not in app_refs or not app_refs["about_window"].get_visible():
+                app_refs["about_window"] = AboutWindow()
+            else:
+                app_refs["about_window"].present()
 
         def on_clipboard_changed():
             GLib.idle_add(history_window.refresh)
@@ -230,10 +236,16 @@ def main():
             Gtk.main_quit()
 
         def open_settings():
-            SettingsWindow()
+            if "settings_window" not in app_refs or not app_refs["settings_window"].get_visible():
+                app_refs["settings_window"] = SettingsWindow()
+            else:
+                app_refs["settings_window"].present()
 
         def open_peers():
-            PeerWindow()
+            if "peer_window" not in app_refs or not app_refs["peer_window"].get_visible():
+                app_refs["peer_window"] = PeerWindow()
+            else:
+                app_refs["peer_window"].present()
 
         indicator = setup_tray_icon(
             on_open=show_history_window,
