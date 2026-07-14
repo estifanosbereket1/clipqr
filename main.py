@@ -31,6 +31,10 @@ from gi.repository import GLib, Gtk
 def main():
     init_db()
 
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icons", "app-icon.png")
+    if os.path.exists(icon_path):
+        Gtk.Window.set_default_icon_from_file(icon_path)
+
     from settings_store import load_settings
     from onboarding_wizard import OnboardingWizard
 
