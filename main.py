@@ -5,6 +5,12 @@ import threading
 import gi
 import uvicorn
 
+import pyperclip
+try:
+    pyperclip.set_clipboard("xclip")
+except pyperclip.PyperclipException as e:
+    print(f"Couldn't use xclip backend ({e}); falling back to auto-detection.")
+
 
 from clipboard_monitor import start_monitoring
 from history_window import HistoryWindow, open_qr_popup
