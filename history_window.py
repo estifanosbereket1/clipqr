@@ -1,19 +1,23 @@
 import gi
+import os
 import pyperclip
 
 
 gi.require_version("Gtk", "3.0")
 from datetime import datetime
-from icon_loader import load_icon
+from icon_loader import load_icon, load_thumbnail
+from image_preview import ImagePreviewPopup
 
-from gi.repository import GLib, Gtk
+from gi.repository import Gdk, GLib, Gtk
 
-from clipboard_wipe import schedule_wipe
+from clipboard_wipe import schedule_wipe, schedule_image_wipe
 from diff_display import DiffPopup
+from image_clipboard import set_clipboard_image
 from qr_display import QrPopup
 from settings_store import load_settings
 from storage import (
     add_entry,
+    add_image_entry,
     delete_entry,
     get_pinned_entries,
     get_recent_unpinned,
@@ -262,7 +266,7 @@ class HistoryWindow(Gtk.Window):
             self.list_box.add(empty_label)
         else:
             for index, entry in enumerate(local_entries):
-                previous_entry = local_entries[index + 1] if index + 1 < len(local_entries) else None
+                previous_entry = self._find_diffable_entry(local_entries, index)
                 row = self._build_row(entry, is_pinned=False, previous_entry=previous_entry)
                 self.list_box.add(row)
 
@@ -273,7 +277,7 @@ class HistoryWindow(Gtk.Window):
             self.synced_expander.set_label(f"Synced from other devices ({len(synced_entries)})")
             self.synced_expander.show()
             for index, entry in enumerate(synced_entries):
-                previous_entry = synced_entries[index + 1] if index + 1 < len(synced_entries) else None
+                previous_entry = self._find_diffable_entry(synced_entries, index)
                 row = self._build_row(entry, is_pinned=False, previous_entry=previous_entry)
                 self.synced_list_box.add(row)
         else:
@@ -315,6 +319,16 @@ class HistoryWindow(Gtk.Window):
         response = dialog.run()
         dialog.destroy()
         return response == Gtk.ResponseType.YES
+
+    def _find_diffable_entry(self, entries, index):
+        """
+        Finds the nearest older entry (skipping images, which have no diff
+        button) to compare `entries[index]` against.
+        """
+        for later in entries[index + 1:]:
+            if later["content_type"] != "image":
+                return later
+        return None
 
     def _format_badge(self, content_type):
         if not content_type or content_type == "text":
@@ -378,14 +392,30 @@ class HistoryWindow(Gtk.Window):
         time_box.pack_start(time_label, False, False, 0)
         row_box.pack_start(time_box, False, False, 0)
 
-        text_label = Gtk.Label(label=truncate(entry["content"]))
-        text_label.set_xalign(0)
-        text_label.set_hexpand(True)
-        text_label.set_ellipsize(3)
-        if stale:
-            text_label.get_style_context().add_class("dim-label")
+        if entry["content_type"] == "image":
+            thumbnail = load_thumbnail(entry["content"], size=44)
+            thumbnail.set_tooltip_text(os.path.basename(entry["content"]))
 
-        row_box.pack_start(text_label, True, True, 0)
+            content_widget = Gtk.EventBox()
+            content_widget.set_visible_window(False)
+            content_widget.add(thumbnail)
+            content_widget.set_halign(Gtk.Align.START)
+            content_widget.connect("button-press-event", self._make_image_preview_handler(entry))
+            content_widget.connect(
+                "enter-notify-event",
+                lambda w, _e: w.get_window().set_cursor(
+                    Gdk.Cursor.new_from_name(w.get_display(), "pointer")
+                ),
+            )
+        else:
+            content_widget = Gtk.Label(label=truncate(entry["content"]))
+            content_widget.set_xalign(0)
+            content_widget.set_ellipsize(3)
+            if stale:
+                content_widget.get_style_context().add_class("dim-label")
+
+        content_widget.set_hexpand(True)
+        row_box.pack_start(content_widget, True, True, 0)
 
         if self.compare_mode:
             checkbox = Gtk.CheckButton()
@@ -396,7 +426,9 @@ class HistoryWindow(Gtk.Window):
             checkbox.connect("toggled", self._make_compare_checkbox_handler(entry))
             row_box.pack_end(checkbox, False, False, 0)
         else:
-            if previous_entry is not None:
+            is_image = entry["content_type"] == "image"
+
+            if previous_entry is not None and not is_image:
                 diff_button = self._icon_button("git-compare", "Compare with previous entry")
                 diff_button.connect(
                     "clicked", self._make_diff_handler(entry, previous_entry)
@@ -421,9 +453,6 @@ class HistoryWindow(Gtk.Window):
             burn_button = self._icon_button(burn_icon, burn_tooltip)
             burn_button.connect("clicked", self._make_burn_toggle_handler(entry))
 
-            qr_button = self._icon_button("qr-code", "Show QR code")
-            qr_button.connect("clicked", self._make_qr_handler(entry))
-
             copy_button = self._icon_button("copy", "Copy to clipboard")
             copy_button.connect("clicked", self._make_copy_handler(entry))
 
@@ -433,7 +462,10 @@ class HistoryWindow(Gtk.Window):
             row_box.pack_end(burn_button, False, False, 0)
             row_box.pack_end(delete_button, False, False, 0)
             row_box.pack_end(copy_button, False, False, 0)
-            row_box.pack_end(qr_button, False, False, 0)
+            if not is_image:
+                qr_button = self._icon_button("qr-code", "Show QR code")
+                qr_button.connect("clicked", self._make_qr_handler(entry))
+                row_box.pack_end(qr_button, False, False, 0)
             row_box.pack_end(pin_button, False, False, 0)
 
         row.add(row_box)
@@ -453,6 +485,12 @@ class HistoryWindow(Gtk.Window):
             InspectorPopup(entry["content"], entry["content_type"])
         return handler
 
+    def _make_image_preview_handler(self, entry):
+        def handler(_widget, _event):
+            ImagePreviewPopup(entry)
+
+        return handler
+
     def _make_diff_handler(self, entry, previous_entry):
         def handler(_button):
             DiffPopup(previous_entry["content"], entry["content"])
@@ -468,13 +506,24 @@ class HistoryWindow(Gtk.Window):
 
     def _make_copy_handler(self, entry):
         def handler(_button):
-            pyperclip.copy(entry["content"])
+            if entry["content_type"] == "image":
+                with open(entry["content"], "rb") as f:
+                    image_bytes = f.read()
+                set_clipboard_image(entry["content"])
 
-            if entry["self_destruct"]:
-                delete_entry(entry["id"])
-                schedule_wipe(entry["content"])
+                if entry["self_destruct"]:
+                    delete_entry(entry["id"])
+                    schedule_image_wipe(image_bytes)
+                else:
+                    add_image_entry(image_bytes)
             else:
-                add_entry(entry["content"])
+                pyperclip.copy(entry["content"])
+
+                if entry["self_destruct"]:
+                    delete_entry(entry["id"])
+                    schedule_wipe(entry["content"])
+                else:
+                    add_entry(entry["content"])
 
             self.refresh()
 

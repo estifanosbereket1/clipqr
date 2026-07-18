@@ -1,7 +1,22 @@
 import subprocess
 import os
 
+import pyperclip
+
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+
+
+def safe_paste_text() -> str | None:
+    """
+    pyperclip.paste() assumes clipboard content is valid UTF-8 text. Once
+    anything binary is on the clipboard (an image copied via this app or any
+    other), it raises UnicodeDecodeError instead of pyperclip.PyperclipException,
+    so callers that might run right after an image copy need this guard.
+    """
+    try:
+        return pyperclip.paste()
+    except UnicodeDecodeError:
+        return None
 
 
 def get_clipboard_image_bytes() -> bytes | None:
@@ -23,6 +38,23 @@ def get_clipboard_image_bytes() -> bytes | None:
 
     return None
 
+
+
+def set_clipboard_image(path: str) -> bool:
+    """
+    Puts the PNG at `path` onto the system clipboard as real image/png data
+    (not a text path), via xclip -- consistent with the rest of this module,
+    so it doesn't reintroduce the wl-paste dock-jitter bug.
+    """
+    try:
+        result = subprocess.run(
+            ["xclip", "-selection", "clipboard", "-t", "image/png", "-i", path],
+            capture_output=True,
+            timeout=3,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
 
 
 def _get_clipboard_types() -> set | None:

@@ -22,11 +22,11 @@
 import time
 import pyperclip
 from storage import add_entry, add_image_entry
-from image_clipboard import get_clipboard_image_bytes
+from image_clipboard import get_clipboard_image_bytes, safe_paste_text
 
 
 def start_monitoring(poll_interval=1.0, on_change=None):
-    last_seen_text = pyperclip.paste()
+    last_seen_text = safe_paste_text()
     last_seen_image_bytes = get_clipboard_image_bytes()
 
     while True:
@@ -47,8 +47,8 @@ def start_monitoring(poll_interval=1.0, on_change=None):
 
             last_seen_image_bytes = None
 
-            current_text = pyperclip.paste()
-            if current_text != last_seen_text:
+            current_text = safe_paste_text()
+            if current_text is not None and current_text != last_seen_text:
                 inserted = add_entry(content=current_text)
                 last_seen_text = current_text
                 if inserted and on_change:
