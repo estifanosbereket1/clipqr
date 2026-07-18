@@ -252,6 +252,8 @@ class HistoryWindow(Gtk.Window):
             if pinned_entries:
                 self.pinned_label.show()
                 for entry in pinned_entries:
+                    if self.compare_mode and entry["content_type"] == "image":
+                        continue
                     row = self._build_row(entry, is_pinned=True, previous_entry=None)
                     self.pinned_list_box.add(row)
             else:
@@ -266,6 +268,8 @@ class HistoryWindow(Gtk.Window):
             self.list_box.add(empty_label)
         else:
             for index, entry in enumerate(local_entries):
+                if self.compare_mode and entry["content_type"] == "image":
+                    continue
                 previous_entry = self._find_diffable_entry(local_entries, index)
                 row = self._build_row(entry, is_pinned=False, previous_entry=previous_entry)
                 self.list_box.add(row)
@@ -277,6 +281,8 @@ class HistoryWindow(Gtk.Window):
             self.synced_expander.set_label(f"Synced from other devices ({len(synced_entries)})")
             self.synced_expander.show()
             for index, entry in enumerate(synced_entries):
+                if self.compare_mode and entry["content_type"] == "image":
+                    continue
                 previous_entry = self._find_diffable_entry(synced_entries, index)
                 row = self._build_row(entry, is_pinned=False, previous_entry=previous_entry)
                 self.synced_list_box.add(row)
@@ -417,7 +423,7 @@ class HistoryWindow(Gtk.Window):
         content_widget.set_hexpand(True)
         row_box.pack_start(content_widget, True, True, 0)
 
-        if self.compare_mode:
+        if self.compare_mode and entry["content_type"] != "image":
             checkbox = Gtk.CheckButton()
             is_selected = any(e["id"] == entry["id"] for e in self.selected_for_compare)
             checkbox.set_active(is_selected)
