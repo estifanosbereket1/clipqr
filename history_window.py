@@ -227,17 +227,6 @@ class HistoryWindow(Gtk.Window):
 
         query = self._get_search_query()
 
-        # if query:
-        #     matched_entries = search_entries(query, limit=100)
-        #     local_entries = [e for e in matched_entries if e["origin"] == "local"]
-        #     synced_entries = [e for e in matched_entries if e["origin"] != "local"]
-        # else:
-        #     recent_entries = get_recent_unpinned(limit=load_settings()["history_limit"])
-        #     # local_entries = [e for e in recent_entries if e["origin"] == "local"]
-        #     # synced_entries = [e for e in recent_entries if e["origin"] != "local"]
-        #     local_entries = [e for e in recent_entries if e["origin"] in ("local", "phone")]
-        #     synced_entries = [e for e in recent_entries if e["origin"] not in ("local", "phone")]
-
         query = self._get_search_query()
         use_regex = self.regex_toggle.get_active()
         type_filter = self.type_filter_combo.get_active_id() or None
@@ -361,13 +350,6 @@ class HistoryWindow(Gtk.Window):
         row_box.set_margin_start(6)
         row_box.set_margin_end(6)
 
-        # --- badge ---
-        # badge_text = self._format_badge(entry["content_type"])
-        # if entry["origin"] != "local":
-        #     peer_label_text = entry["origin"].split(".")[0]  # strip the .local. suffix etc, just show hostname
-        #     origin_label = Gtk.Label(label=f"↴ {peer_label_text}")
-        #     origin_label.get_style_context().add_class("dim-label")
-        #     row_box.pack_start(origin_label, False, False, 0)
 
         badge_text = self._format_badge(entry["content_type"])
         if badge_text:
@@ -477,7 +459,6 @@ class HistoryWindow(Gtk.Window):
             row_box.pack_end(burn_button, False, False, 0)
             row_box.pack_end(delete_button, False, False, 0)
             row_box.pack_end(copy_button, False, False, 0)
-            row_container.pack_start(row_box, False, False, 0)
             if not is_image:
                 qr_button = self._icon_button("qr-code", "Show QR code")
                 qr_button.connect("clicked", self._make_qr_handler(entry))
@@ -485,11 +466,15 @@ class HistoryWindow(Gtk.Window):
 
             row_box.pack_end(pin_button, False, False, 0)
 
-            if not self.compare_mode:
-                tags_row = self._build_tags_row(entry)
-                row_container.pack_start(tags_row, False, False, 0)
+
 
         # row.add(row_box)
+        row_container.pack_start(row_box, False, False, 0)
+
+        if not self.compare_mode:
+            tags_row = self._build_tags_row(entry)
+            row_container.pack_start(tags_row, False, False, 0)
+
         row.add(row_container)
         return row
 
