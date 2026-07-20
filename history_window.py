@@ -115,10 +115,43 @@ class HistoryWindow(Gtk.Window):
         search_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         search_row.pack_start(self.search_entry, True, True, 0)
 
-        self.regex_toggle = Gtk.ToggleButton(label=".*")
-        self.regex_toggle.set_tooltip_text("Treat search as regex")
-        self.regex_toggle.connect("toggled", lambda _btn: self.refresh())
-        search_row.pack_start(self.regex_toggle, False, False, 0)
+        # Container with horizontal spacing
+        regex_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        regex_box.set_valign(Gtk.Align.CENTER)
+
+        regex_label = Gtk.Label(label="Regex")
+        regex_label.get_style_context().add_class("dim-label")
+        regex_label.set_valign(Gtk.Align.CENTER)
+        regex_label.set_margin_end(4)
+
+        self.regex_switch = Gtk.Switch()
+        self.regex_switch.set_active(False)
+        self.regex_switch.set_valign(Gtk.Align.CENTER)
+        self.regex_switch.set_tooltip_text("Enable Regular Expression search mode")
+        self.regex_switch.connect("notify::active", lambda _switch, _gparam: self.refresh())
+
+        # Valid GTK3 CSS for sizing switches
+        switch_css = Gtk.CssProvider()
+        switch_css.load_from_data(b"""
+            switch {
+                min-height: 18px;
+                min-width: 36px;
+            }
+            switch slider {
+                min-height: 14px;
+                min-width: 14px;
+            }
+        """)
+        self.regex_switch.get_style_context().add_provider(
+            switch_css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+        regex_box.pack_start(regex_label, False, False, 0)
+        regex_box.pack_start(self.regex_switch, False, False, 0)
+        regex_box.set_margin_end(10)
+
+        search_row.pack_start(regex_box, False, False, 0)
+
 
         self.type_filter_combo = Gtk.ComboBoxText()
         self.type_filter_combo.append("", "All types")
@@ -133,9 +166,18 @@ class HistoryWindow(Gtk.Window):
             ("text", "Text"),
         ):
             self.type_filter_combo.append(type_id, type_label)
+
         self.type_filter_combo.set_active_id("")
+
+
         self.type_filter_combo.connect("changed", lambda _combo: self.refresh())
         search_row.pack_start(self.type_filter_combo, False, False, 0)
+
+        self.tag_filter_combo = Gtk.ComboBoxText()
+        self.tag_filter_combo.append("", "All tags")
+        self.tag_filter_combo.set_active_id("")
+        self.tag_filter_changed_id = self.tag_filter_combo.connect("changed", lambda _combo: self.refresh())
+        search_row.pack_start(self.tag_filter_combo, False, False, 0)
 
         outer_box.pack_start(search_row, False, False, 0)
 
@@ -220,19 +262,39 @@ class HistoryWindow(Gtk.Window):
         """Reload entries from storage and rebuild both sections."""
         for child in self.pinned_list_box.get_children():
             self.pinned_list_box.remove(child)
+
         for child in self.list_box.get_children():
             self.list_box.remove(child)
 
+        # Repopulate tags without triggering the "changed" signal
+        from storage import get_all_tags
+        self.tag_filter_combo.handler_block(self.tag_filter_changed_id)
 
+        current_tag_selection = self.tag_filter_combo.get_active_id()
+        self.tag_filter_combo.remove_all()
+        self.tag_filter_combo.append("", "All tags")
+        for tag in get_all_tags():
+            self.tag_filter_combo.append(tag, tag)
+        self.tag_filter_combo.set_active_id(current_tag_selection or "")
+
+        self.tag_filter_combo.handler_unblock(self.tag_filter_changed_id)
 
         query = self._get_search_query()
-
-        query = self._get_search_query()
-        use_regex = self.regex_toggle.get_active()
+        use_regex = self.regex_switch.get_active()
         type_filter = self.type_filter_combo.get_active_id() or None
+        tag_filter = self.tag_filter_combo.get_active_id() or None
 
-        if query:
-            matched_entries = search_entries(query, limit=100, use_regex=use_regex, content_type_filter=type_filter)
+        # Check if ANY filter or search is active
+        is_searching = bool(query or type_filter or tag_filter)
+
+        if is_searching:
+            matched_entries = search_entries(
+                query,
+                limit=100,
+                use_regex=use_regex,
+                content_type_filter=type_filter,
+                tag_filter=tag_filter
+            )
             local_entries = [e for e in matched_entries if e["origin"] in ("local", "phone")]
             synced_entries = [e for e in matched_entries if e["origin"] not in ("local", "phone")]
         else:
@@ -240,7 +302,7 @@ class HistoryWindow(Gtk.Window):
             local_entries = [e for e in recent_entries if e["origin"] in ("local", "phone")]
             synced_entries = [e for e in recent_entries if e["origin"] not in ("local", "phone")]
 
-        if not query:
+        if not is_searching:
             pinned_entries = get_pinned_entries()
             if pinned_entries:
                 self.pinned_label.show()
@@ -253,9 +315,10 @@ class HistoryWindow(Gtk.Window):
                 self.pinned_label.hide()
         else:
             self.pinned_label.hide()
+
         if not local_entries:
             empty_label = Gtk.Label(
-                label="No matching entries." if query else "No clipboard history yet."
+                label="No matching entries." if is_searching else "No clipboard history yet."
             )
             empty_label.set_margin_top(20)
             self.list_box.add(empty_label)
@@ -341,10 +404,7 @@ class HistoryWindow(Gtk.Window):
         row = Gtk.ListBoxRow()
         row_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        # row_box.set_margin_top(4)
-        # row_box.set_margin_bottom(4)
-        # row_box.set_margin_start(6)
-        # row_box.set_margin_end(6)
+
         row_box.set_margin_top(4)
         row_box.set_margin_bottom(2)
         row_box.set_margin_start(6)
