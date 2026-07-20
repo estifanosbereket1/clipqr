@@ -538,10 +538,29 @@ class HistoryWindow(Gtk.Window):
         row.add(row_container)
         return row
 
+    # def _make_remove_tag_handler(self, entry, tag):
+    #     def handler(_button):
+    #         remove_tag(entry["id"], tag)
+    #         self.refresh()
+    #     return handler
+    #
     def _make_remove_tag_handler(self, entry, tag):
         def handler(_button):
-            remove_tag(entry["id"], tag)
-            self.refresh()
+            dialog = Gtk.MessageDialog(
+                transient_for=self,
+                flags=0,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.YES_NO,
+                text=f"Remove tag '{tag}'?",
+            )
+            dialog.format_secondary_text(f"Are you sure you want to remove this tag?")
+            response = dialog.run()
+            dialog.destroy()
+
+            if response == Gtk.ResponseType.YES:
+                remove_tag(entry["id"], tag)
+                self.refresh()
+
         return handler
 
     def _make_add_tag_handler(self, entry):
