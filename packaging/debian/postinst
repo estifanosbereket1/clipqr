@@ -1,0 +1,49 @@
+#!/bin/sh
+set -e
+
+APP_DIR=/usr/share/clipvault
+VENV_DIR=/var/lib/clipvault/venv
+
+case "$1" in
+    configure)
+        echo "Setting up ClipVault's Python environment (this can take a minute)..."
+
+        if [ ! -d "$VENV_DIR" ]; then
+            python3 -m venv --system-site-packages "$VENV_DIR"
+        fi
+
+        "$VENV_DIR/bin/pip" install --upgrade pip
+        "$VENV_DIR/bin/pip" install -r "$APP_DIR/requirements.txt"
+
+        # Only take over the `mkcert` command if the system doesn't already
+        # have one -- never clobber a user- or distro-provided mkcert.
+        if ! command -v mkcert >/dev/null 2>&1; then
+            ln -sf "$APP_DIR/vendor/mkcert" /usr/local/bin/mkcert
+        fi
+
+        # NOTE: `mkcert -install` (trusting the local CA) is intentionally
+        # NOT run here. It writes to the invoking user's CA store and
+        # browser/NSS trust databases, so it has to run as the real desktop
+        # user, not as root in postinst. ClipVault does this itself on
+        # first startup (see cert_manager.ensure_ca_installed()).
+
+        # Register (not start) the user unit for every current and future
+        # user. It activates next login; postinst has no access to any
+        # user's session/D-Bus bus, so it deliberately does not start it.
+        systemctl --global enable clipvault.service >/dev/null 2>&1 || true
+
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q /usr/share/applications || true
+        fi
+
+        echo ""
+        echo "ClipVault installed. Log out and back in, or run:"
+        echo "  systemctl --user start clipvault.service"
+        echo "to start it now without logging out."
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+exit 0

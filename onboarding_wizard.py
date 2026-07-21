@@ -444,6 +444,17 @@ class OnboardingWizard(Gtk.Window):
             "port": self.selected_port,
         })
 
+        if self.selected_port:
+            from cert_manager import get_cert_dir
+            from qr_server import restart_http_server
+
+            cert_dir = get_cert_dir()
+            restart_http_server(
+                cert_path=str(cert_dir / "cert.pem"),
+                key_path=str(cert_dir / "key.pem"),
+                port=self.selected_port,
+            )
+
         if self.captured_hotkey_accelerator:
             register_custom_shortcut(
                 name="Open ClipVault",

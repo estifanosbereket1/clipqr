@@ -3,7 +3,6 @@ import subprocess
 import threading
 
 import gi
-import uvicorn
 
 import pyperclip
 try:
@@ -16,7 +15,6 @@ from clipboard_monitor import start_monitoring
 from history_window import HistoryWindow, open_qr_popup
 from hotkey import setup_signal_listener
 from playback_window import PlaybackWindow
-from qr_server import app as qr_app
 from settings_window import SettingsWindow
 from storage import init_db
 from tray import setup_tray_icon
@@ -48,8 +46,11 @@ def main():
     app_refs = {}
 
     def start_server_and_certs():
-        from cert_manager import get_cert_dir, regenerate_cert_for_ip
+        from cert_manager import ensure_ca_installed, get_cert_dir, regenerate_cert_for_ip
+        from qr_server import start_http_server
         from settings_store import check_ip_changed, save_settings
+
+        ensure_ca_installed()
 
         changed, old_ip, new_ip = check_ip_changed()
         if changed and new_ip:
@@ -62,17 +63,7 @@ def main():
         cert_path = str(cert_dir / "cert.pem")
         key_path = str(cert_dir / "key.pem")
 
-        threading.Thread(
-            target=uvicorn.run,
-            kwargs={
-                "app": qr_app,
-                "host": "0.0.0.0",
-                "port": settings["port"],
-                "ssl_keyfile": key_path,
-                "ssl_certfile": cert_path,
-            },
-            daemon=True,
-        ).start()
+        start_http_server(cert_path, key_path, settings["port"])
 
     def finish_startup():
         from theme_manager import apply_theme_for_current_system_mode, watch_system_theme_changes

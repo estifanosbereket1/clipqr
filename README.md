@@ -22,27 +22,38 @@ A clipboard manager for Ubuntu/Linux Mint with a tray icon, a global hotkey, and
 
 ## Install
 
-The fastest way to install:
+Build and install the `.deb` package:
+
+```bash
+git clone https://github.com/estifanosbereket1/clipvault.git
+cd clipvault
+./packaging/build-deb.sh
+sudo apt install ./clipvault_*.deb
+```
+
+`apt install ./file.deb` (rather than `dpkg -i`) resolves and installs ClipVault's system dependencies (GTK bindings, `xclip`, etc.) automatically. The package sets up a Python virtual environment and a local HTTPS certificate authority the first time it's installed, and registers a systemd user service so ClipVault starts on login and restarts if it crashes.
+
+After installing, log out and back in, or start it immediately with:
+
+```bash
+systemctl --user start clipvault.service
+```
+
+The first time it runs, a setup wizard will walk you through choosing a theme, a port, hotkey, and phone access , all in under a minute.
+
+To update to a newer version, rebuild the `.deb` from an updated checkout and `apt install` it again — `apt` treats it as an upgrade in place.
+
+See `packaging/README.md` for how the package is put together and how to test it before installing.
+
+### Legacy source install (deprecated)
+
+Before the `.deb` existed, ClipVault was installed by cloning the repo and running a script that set up a venv directly in place. This still works but is no longer the recommended path — it doesn't give you a real install/uninstall, and the run-from-source model is exactly what packaging above was built to replace.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/estifanosbereket1/clipvault/main/bootstrap.sh | bash
 ```
 
-This clones the repo to `~/ClipVault`, installs all dependencies, sets up HTTPS certificates, configures autostart, and launches the app. The first time it runs, a setup wizard will walk you through choosing a theme, a port, hotkey, and phone access , all in under a minute.
-
-Re-running the same command later will update an existing install instead of duplicating it.
-
-### What the installer does under the hood
-
-- Installs system dependencies (GTK bindings, `xclip`, `mkcert`, etc.)
-- Creates a Python virtual environment and installs pinned dependencies
-- Sets up a local HTTPS certificate authority via `mkcert`
-- Registers a systemd user service so ClipVault starts on login and restarts if it crashes
-- Adds a `.desktop` entry so it launches like any normal app, no terminal required after install
-
-### Manual install
-
-If you'd rather not pipe a script into bash, you can do it step by step:
+or, step by step:
 
 ```bash
 git clone https://github.com/estifanosbereket1/clipvault.git
@@ -85,7 +96,9 @@ ClipVault checks GitHub Releases for new versions. Click **Check for Updates** i
 
 ## Uninstalling
 
-Click **Uninstall ClipVault** in the tray menu, or run `./uninstall.sh` from the project folder directly. You'll be asked separately whether to keep your clipboard history/settings and whether to remove the project folder itself.
+Click **Uninstall ClipVault** in the tray menu — it removes your GNOME hotkey, asks whether to keep your clipboard history/settings, then runs `sudo apt remove clipvault`. You can also just run `sudo apt remove clipvault` yourself; your data at `~/.config/clipvault` and `~/.local/share/clipvault` is left in place either way unless you delete it manually.
+
+(Legacy source installs: run `./uninstall.sh` from the project folder instead.)
 
 ## Configuration
 
@@ -137,14 +150,16 @@ timeline_widget.py      # custom-drawn playback timeline
 palettes.py             # color palette definitions
 theme_manager.py        # CSS theming + system dark/light detection
 palette_picker.py       # theme selection UI
-icon_loader.py           # bundled SVG icon loader
-about_window.py           # About window
-update_checker.py         # GitHub Releases-based update checker
-port_checker.py            # port availability checking for onboarding
-install.sh                  # automated installer
-bootstrap.sh                 # curl-friendly install entrypoint
-uninstall.sh                  # uninstaller
-main.py                        # entry point, wires everything together
+icon_loader.py          # bundled SVG icon loader
+about_window.py         # About window
+update_checker.py       # GitHub Releases-based update checker
+port_checker.py         # port availability checking for onboarding
+main.py                 # entry point, wires everything together
+VERSION                 # version string; also read at runtime (see packaging/root/usr/bin/clipvault)
+packaging/              # .deb build (packaging/build-deb.sh); see packaging/README.md
+install.sh              # legacy source installer (deprecated, see Install section)
+bootstrap.sh            # legacy curl-friendly install entrypoint (deprecated)
+uninstall.sh            # legacy source uninstaller (deprecated)
 ```
 
 Setting `GITHUB_TOKEN` as an environment variable raises the update checker's rate limit from 60 to 5000 requests/hour , useful during development, not required for normal use.

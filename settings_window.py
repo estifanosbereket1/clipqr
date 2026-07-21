@@ -216,6 +216,7 @@ class SettingsWindow(Gtk.Window):
         popup.show_all()
 
     def on_save_settings_clicked(self, _button):
+        previous_port = load_settings()["port"]
         new_values = {
             "history_limit": self.history_spin.get_value_as_int(),
             "poll_interval": round(self.poll_spin.get_value(), 1),
@@ -229,8 +230,20 @@ class SettingsWindow(Gtk.Window):
         else:
             from theme_manager import apply_theme_for_current_system_mode
             apply_theme_for_current_system_mode()
+
+            if new_values["port"] != previous_port:
+                from cert_manager import get_cert_dir
+                from qr_server import restart_http_server
+
+                cert_dir = get_cert_dir()
+                restart_http_server(
+                    cert_path=str(cert_dir / "cert.pem"),
+                    key_path=str(cert_dir / "key.pem"),
+                    port=new_values["port"],
+                )
+
             self.settings_status_label.set_text(
-                "Saved. Poll interval and port changes require an app restart."
+                "Saved. Poll interval changes require an app restart."
             )
 
     # def on_save_settings_clicked(self, _button):

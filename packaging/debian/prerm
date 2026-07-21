@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        # Removes the per-user enablement symlinks only. Cannot stop any
+        # already-running per-user instances -- those keep running until
+        # the user quits from the tray icon or logs out.
+        systemctl --global disable clipvault.service >/dev/null 2>&1 || true
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Launcher for the packaged ClipVault .deb.
+set -e
+
+APP_DIR=/usr/share/clipvault
+VENV_PY=/var/lib/clipvault/venv/bin/python3
+
+if [ ! -x "$VENV_PY" ]; then
+    echo "ClipVault's Python environment is missing ($VENV_PY)." >&2
+    echo "Try: sudo apt install --reinstall clipvault" >&2
+    exit 1
+fi
+
+cd "$APP_DIR"
+exec "$VENV_PY" "$APP_DIR/main.py" "$@"

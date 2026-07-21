@@ -2,7 +2,9 @@ import html
 import json
 import os
 import subprocess
+import threading
 
+import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
@@ -21,6 +23,37 @@ def notify_content_received():
         _on_phone_content_received()
 
 app = FastAPI()
+
+_server: uvicorn.Server | None = None
+_server_thread: threading.Thread | None = None
+
+
+def start_http_server(cert_path: str, key_path: str, port: int) -> None:
+    """Starts the HTTPS server in a background thread, keeping a handle to
+    the uvicorn.Server instance so it can be stopped later by restart_http_server()."""
+    global _server, _server_thread
+
+    config = uvicorn.Config(
+        app=app, host="0.0.0.0", port=port, ssl_keyfile=key_path, ssl_certfile=cert_path
+    )
+    _server = uvicorn.Server(config)
+    _server_thread = threading.Thread(target=_server.run, daemon=True)
+    _server_thread.start()
+
+
+def restart_http_server(cert_path: str, key_path: str, port: int) -> None:
+    """
+    Stops the running server (if any) and starts a fresh one on the given
+    port/cert. Lets a port change (from onboarding or Settings) take effect
+    immediately instead of requiring the whole app to be restarted.
+    """
+    if _server:
+        _server.should_exit = True
+    if _server_thread:
+        _server_thread.join(timeout=5)
+
+    start_http_server(cert_path, key_path, port)
+
 
 @app.get("/manifest.json")
 def get_manifest():

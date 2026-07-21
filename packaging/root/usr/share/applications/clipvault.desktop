@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ClipVault
+Comment=Clipboard manager with QR-to-phone sync
+Exec=/usr/bin/clipvault
+Icon=/usr/share/clipvault/assets/icons/app-icon.png
+Terminal=false
+Categories=Utility;
+StartupNotify=true

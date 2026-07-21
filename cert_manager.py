@@ -11,6 +11,24 @@ def get_cert_dir() -> Path:
     return cert_dir
 
 
+def ensure_ca_installed() -> None:
+    """
+    Runs `mkcert -install` once per user to trust the local CA. Has to run
+    as the real desktop user (not root), since it writes into that user's
+    CA/NSS/browser trust stores -- this is why the .deb's postinst doesn't
+    do it and it happens here at app startup instead.
+    """
+    marker = get_cert_dir() / ".ca-installed"
+    if marker.exists():
+        return
+
+    result = subprocess.run(["mkcert", "-install"], capture_output=True, text=True)
+    if result.returncode == 0:
+        marker.touch()
+    else:
+        print(f"mkcert -install failed: {result.stderr}")
+
+
 def regenerate_cert_for_ip(ip: str) -> tuple[str, str] | None:
     """
     Runs `mkcert <ip> localhost 127.0.0.1` to produce a fresh cert signed by

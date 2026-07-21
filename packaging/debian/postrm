@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+
+APP_DIR=/usr/share/clipvault
+VENV_DIR=/var/lib/clipvault/venv
+
+remove_generated_state() {
+    rm -rf "$VENV_DIR"
+    if [ -L /usr/local/bin/mkcert ] && [ "$(readlink /usr/local/bin/mkcert)" = "$APP_DIR/vendor/mkcert" ]; then
+        rm -f /usr/local/bin/mkcert
+    fi
+}
+
+case "$1" in
+    remove)
+        remove_generated_state
+        if command -v update-desktop-database >/dev/null 2>&1; then
+            update-desktop-database -q /usr/share/applications || true
+        fi
+        ;;
+    purge)
+        remove_generated_state
+        ;;
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+esac
+
+# Deliberately NOT touched by this script, on any code path above:
+#   ~/.local/share/clipvault  (clipboard history, images)
+#   ~/.config/clipvault       (settings, generated per-user TLS certs)
+#   the GNOME custom keybinding registered via dconf
+# postrm runs once as root regardless of how many users used the app; it
+# has no correct way to reach into arbitrary users' home directories or
+# per-user dconf/session state. See packaging/README.md.
+
+exit 0

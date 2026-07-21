@@ -1,0 +1,13 @@
+Package: clipvault
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3-venv, python3-pip, git, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, xclip, libnss3-tools
+Maintainer: ClipVault <support@smoltrade.com>
+Homepage: https://github.com/estifanosbereket1/clipvault
+Description: Clipboard manager with tray icon, hotkey, and QR-to-phone sync
+ ClipVault is a GTK3 clipboard manager for GNOME with pinning, tags,
+ snippets, content-type detection, LAN peer sync, and a local HTTPS
+ QR-code flow for copying clipboard entries straight to your phone.
+ Everything stays on your LAN; nothing is sent to a cloud server.
