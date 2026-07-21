@@ -49,6 +49,9 @@ def init_db():
         cur.execute(
             "CREATE TABLE IF NOT EXISTS tags (entry_id INTEGER NOT NULL, tag TEXT NOT NULL, PRIMARY KEY (entry_id, tag))"
         )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS snippets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, content TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+        )
         cur.execute("PRAGMA table_info(history)")
         columns = [row["name"] for row in cur.fetchall()]
         if "pinned_at" not in columns:
@@ -347,3 +350,53 @@ def get_all_tags() -> list[str]:
         cur = conn.cursor()
         rows = cur.execute("SELECT DISTINCT tag FROM tags ORDER BY tag").fetchall()
         return [row["tag"] for row in rows]
+
+def add_snippet(name: str, content: str):
+    name = name.strip()
+    content = content.strip()
+    if not name or not content:
+        return None
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO snippets (name, content) VALUES (?, ?)",
+            (name, content),
+        )
+        return cur.lastrowid
+
+
+def update_snippet(snippet_id: int, name: str, content: str):
+    name = name.strip()
+    content = content.strip()
+    if not name or not content:
+        return False
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE snippets SET name = ?, content = ? WHERE id = ?",
+            (name, content, snippet_id),
+        )
+        return cur.rowcount > 0
+
+
+def delete_snippet(snippet_id: int):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
+        return cur.rowcount > 0
+
+
+def get_all_snippets():
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM snippets ORDER BY name COLLATE NOCASE"
+        ).fetchall()
+
+
+def get_snippet_by_id(snippet_id: int):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM snippets WHERE id = ?", (snippet_id,)
+        ).fetchone()

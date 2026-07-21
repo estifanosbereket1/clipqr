@@ -129,6 +129,13 @@ def main():
                 perform_update()
                 quit_app()
 
+        def open_snippets():
+            from snippets_window import SnippetsWindow
+            if "snippets_window" not in app_refs or not app_refs["snippets_window"].get_visible():
+                app_refs["snippets_window"] = SnippetsWindow()
+            else:
+                app_refs["snippets_window"].present()
+
         def show_send_qr():
             settings = load_settings()
             url = f"https://{settings['last_known_ip']}:{settings['port']}/send"
@@ -293,6 +300,7 @@ def main():
             on_playback=open_playback,
             on_peers=open_peers,
             on_send_from_phone=show_send_qr,
+            on_snippets=open_snippets,
             on_quit=quit_app,
             on_check_updates=on_check_updates,
             on_about=open_about,
