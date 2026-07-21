@@ -46,6 +46,12 @@ def init_db():
         cur.execute(
             "CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY,content TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, pinned BOOLEAN DEFAULT 0)"
         )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS tags (entry_id INTEGER NOT NULL, tag TEXT NOT NULL, PRIMARY KEY (entry_id, tag))"
+        )
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS snippets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, content TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
+        )
         cur.execute("PRAGMA table_info(history)")
         columns = [row["name"] for row in cur.fetchall()]
         if "pinned_at" not in columns:
@@ -104,6 +110,7 @@ def get_pinned_entries():
         return cur.execute(
             "SELECT * FROM history WHERE pinned = 1 ORDER BY pinned_at DESC"
         ).fetchall()
+
 
 
 def get_oldest_pinned_entry():
@@ -246,71 +253,150 @@ def _register_regex_function(conn):
             return False
     conn.create_function("REGEXP", 2, regexp)
 
-def search_entries(query: str, limit: int = 50, use_regex: bool = False, content_type_filter: str = None):
-    """
-    Searches history. If use_regex is True, query is treated as a regex
-    pattern; otherwise fuzzy substring matching is used. content_type_filter,
-    if given, restricts results to entries whose content_type matches exactly
-    or (for "code") starts with "code:".
-    """
-    if use_regex:
+
+
+def search_entries(query: str, limit: int = 50, use_regex: bool = False, content_type_filter: str = None, tag_filter: str = None):
+    # Only run regex if there is actually a query
+    if use_regex and query:
         with get_connection() as conn:
             _register_regex_function(conn)
             cur = conn.cursor()
-            sql = "SELECT * FROM history WHERE content REGEXP ? AND pinned = 0"
+            sql = "SELECT DISTINCT history.* FROM history"
+            if tag_filter:
+                sql += " JOIN tags ON tags.entry_id = history.id"
+            sql += " WHERE history.content REGEXP ? AND history.pinned = 0"
             params = [query]
             if content_type_filter:
                 if content_type_filter == "code":
-                    sql += " AND content_type LIKE 'code:%'"
+                    sql += " AND history.content_type LIKE 'code:%'"
                 else:
-                    sql += " AND content_type = ?"
+                    sql += " AND history.content_type = ?"
                     params.append(content_type_filter)
-            sql += " ORDER BY created_at DESC LIMIT ?"
+            if tag_filter:
+                sql += " AND tags.tag = ?"
+                params.append(tag_filter)
+            sql += " ORDER BY history.created_at DESC LIMIT ?"
             params.append(limit)
             try:
                 return cur.execute(sql, params).fetchall()
             except sqlite3.OperationalError:
-                return []  # invalid regex pattern, fail gracefully with no results
+                return []
 
     with get_connection() as conn:
         cur = conn.cursor()
-        candidates_sql = "SELECT * FROM history WHERE pinned = 0"
+        candidates_sql = "SELECT DISTINCT history.* FROM history"
+        if tag_filter:
+            candidates_sql += " JOIN tags ON tags.entry_id = history.id"
+        candidates_sql += " WHERE history.pinned = 0"
         params = []
         if content_type_filter:
             if content_type_filter == "code":
-                candidates_sql += " AND content_type LIKE 'code:%'"
+                candidates_sql += " AND history.content_type LIKE 'code:%'"
             else:
-                candidates_sql += " AND content_type = ?"
+                candidates_sql += " AND history.content_type = ?"
                 params.append(content_type_filter)
-        candidates_sql += " ORDER BY created_at DESC LIMIT 500"
+        if tag_filter:
+            candidates_sql += " AND tags.tag = ?"
+            params.append(tag_filter)
+        candidates_sql += " ORDER BY history.created_at DESC LIMIT 500"
         candidates = cur.execute(candidates_sql, params).fetchall()
+
+    # If the user is just filtering by tag/type with no text, skip fuzzy matching
+    if not query:
+        return candidates[:limit]
 
     scored = []
     for row in candidates:
         score = fuzz.partial_ratio(query.lower(), row["content"].lower())
         if score >= FUZZY_MATCH_THRESHOLD:
             scored.append((score, row))
-
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return [row for score, row in scored[:limit]]
 
-# def search_entries(query: str, limit: int = 50):
-#     """
-#     Fuzzy-searches history for entries similar to the query, so typos and
-#     near-misses still match. Scores every candidate against the query and
-#     returns matches above FUZZY_MATCH_THRESHOLD, best matches first.
-#     """
-#     with get_connection() as conn:
-#         cur = conn.cursor()
-#         candidates = cur.execute(
-#             "SELECT * FROM history WHERE pinned = 0 ORDER BY created_at DESC LIMIT 500"
-#         ).fetchall()
 
-#     scored = []
-#     for row in candidates:
-#         score = fuzz.partial_ratio(query.lower(), row["content"].lower())
-#         if score >= FUZZY_MATCH_THRESHOLD:
-#             scored.append((score, row))
+def add_tag(entry_id: int, tag: str):
+    tag = tag.strip().lower()
+    if not tag:
+        return
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT OR IGNORE INTO tags (entry_id, tag) VALUES (?, ?)",
+            (entry_id, tag),
+        )
 
-#     scored.sort(key=lambda pair: pair[0], reverse=True)
-#     return [row for score, row in scored[:limit]]
+
+def remove_tag(entry_id: int, tag: str):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM tags WHERE entry_id = ? AND tag = ?",
+            (entry_id, tag),
+        )
+
+
+def get_tags_for_entry(entry_id: int) -> list[str]:
+    with get_connection() as conn:
+        cur = conn.cursor()
+        rows = cur.execute(
+            "SELECT tag FROM tags WHERE entry_id = ? ORDER BY tag",
+            (entry_id,),
+        ).fetchall()
+        return [row["tag"] for row in rows]
+
+
+def get_all_tags() -> list[str]:
+    with get_connection() as conn:
+        cur = conn.cursor()
+        rows = cur.execute("SELECT DISTINCT tag FROM tags ORDER BY tag").fetchall()
+        return [row["tag"] for row in rows]
+
+def add_snippet(name: str, content: str):
+    name = name.strip()
+    content = content.strip()
+    if not name or not content:
+        return None
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO snippets (name, content) VALUES (?, ?)",
+            (name, content),
+        )
+        return cur.lastrowid
+
+
+def update_snippet(snippet_id: int, name: str, content: str):
+    name = name.strip()
+    content = content.strip()
+    if not name or not content:
+        return False
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE snippets SET name = ?, content = ? WHERE id = ?",
+            (name, content, snippet_id),
+        )
+        return cur.rowcount > 0
+
+
+def delete_snippet(snippet_id: int):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
+        return cur.rowcount > 0
+
+
+def get_all_snippets():
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM snippets ORDER BY name COLLATE NOCASE"
+        ).fetchall()
+
+
+def get_snippet_by_id(snippet_id: int):
+    with get_connection() as conn:
+        cur = conn.cursor()
+        return cur.execute(
+            "SELECT * FROM snippets WHERE id = ?", (snippet_id,)
+        ).fetchone()
