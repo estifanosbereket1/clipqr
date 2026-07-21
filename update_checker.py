@@ -3,7 +3,7 @@ import subprocess
 import sys
 import os
 
-GITHUB_REPO = "estifanosbereket1/clipqr"
+GITHUB_REPO = "estifanosbereket1/clipvault"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 
